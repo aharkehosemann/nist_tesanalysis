@@ -1,25 +1,21 @@
 import sys
-from time import sleep
-import math
-from scipy import odr
-from numpy import zeros, append
 import numpy as np
-from scipy import linspace, stats, fftpack
-#from scipy.io import write_array
 import scipy
-import scipy.optimize
-import scipy.interpolate
-from scipy.signal import hilbert
+from scipy.optimize import curve_fit
 import pylab
-# import pickle
 import pdb
 from collections import OrderedDict
+# from time import sleep
+# import math
+# from scipy import linspace, stats, fftpack, optimize, interpolate, odr
+# from scipy.signal import hilbert
 
-
+# if you give it sigma, it just uses the relative values of those errors, but pcov is rescaled by the sample variance of the data such that you get reduced chi-squared equal to one
+# if you want your pcov that comes out to acutally use the sigmas you're putting in and take them as real sigma, set aboslute_sigma=True
 kB = 1.3806503e-23   # Boltzmann constant
-mcolors = pylab.rcParams['axes.prop_cycle'].by_key()['color']*5   # for manual iteration through matplotlib default colors
+mcolors = pylab.rcParams['axes.prop_cycle'].by_key()['color']*5   # iterate through matplotlib default colors
 
-class TESAnalyze2():
+class TESAnalyze():
     '''
     Analysis functions
     '''
@@ -32,20 +28,27 @@ class TESAnalyze2():
         if vb_step < 0:   # reverse order if data was taken from high V -> 0
             vbias = vbias[::-1]
             vfb = vfb[::-1] 
-        n_fit = self.ivFitNormal(vbias, vfb, vbias_offset, v_nfit, show_plot=show_plot)
+        n_output = self.ivFitNormal(vbias, vfb, vbias_offset, v_nfit, show_plot=show_plot)   # *
+        n_fit = n_output[0]; norm_inds = n_output[1]   # *
+        # n_fit = self.ivFitNormal(vbias, vfb, vbias_offset, v_nfit, show_plot=show_plot)
         if n_fit[0] < 0:
             # print('normal branch has negative slope, flipping v_fb')
             vfb = -vfb
-            n_fit = self.ivFitNormal(vbias, vfb, vbias_offset, v_nfit, show_plot=show_plot)
+            n_output = self.ivFitNormal(vbias, vfb, vbias_offset, v_nfit, show_plot=show_plot)   # *
+            n_fit = n_output[0]; norm_inds = n_output[1]  # *
+            # n_fit = self.ivFitNormal(vbias, vfb, vbias_offset, v_nfit, show_plot=show_plot)   # *
         normal_offset = n_fit[1]
-        sc_fit = self.ivFitSuperconduct(vbias, vfb, vbias_offset, show_plot=show_plot, ignore_nans=ignore_nans)
+        sc_fit, end_sc = self.ivFitSuperconduct(vbias, vfb, vbias_offset, show_plot=show_plot, ignore_nans=ignore_nans)   # *
+        # sc_fit = self.ivFitSuperconduct(vbias, vfb, vbias_offset, show_plot=show_plot, ignore_nans=ignore_nans)   # *
         m_sc = sc_fit[0]
         if rpar is None:
             rpar = rsh*(rfb*mr/(rbias*m_sc)-1.0)
-            # print('Rpar = ', rpar)           
+            # print('Rpar = ', rpar)  
+        # pdb.set_trace()         
         vtes, ites, rtes, ptes, i_meas = self.ivConvertTDM(vbias, vfb, rfb, rbias, rsh, mr, rpar, normal_offset, vbias_offset, i_offset)
         
-        return vtes, ites, rtes, ptes, i_meas, n_fit, sc_fit, rpar
+        return vtes, ites, rtes, ptes, i_meas, n_fit, norm_inds, sc_fit, end_sc, rpar   # *
+        # return vtes, ites, rtes, ptes, i_meas, n_fit, sc_fit, rpar   # *
 
     def ivConvertTDM(self, vbias, vfb, rfb, rbias, rsh, mr, rpar, normal_offset, vbias_offset=0.0, i_offset=0.0):
         '''Convert IV data.'''
@@ -69,17 +72,18 @@ class TESAnalyze2():
 
         x = vbias-vbias_offset
         y = vfb
-        ind_above = np.where(x>v_nfit)
-        m_a, b_a = np.polyfit(x[ind_above], y[ind_above], 1)
+        norm_inds = np.where(x>v_nfit)
+        m_a, b_a = np.polyfit(x[norm_inds], y[norm_inds], 1)
         n_fit = [m_a, b_a]
-        xf = x[ind_above]
+        xf = x[norm_inds]
         yfa = xf*m_a+b_a
         if show_plot is True:
             pylab.figure()
             pylab.plot(x,y,'.', label='Data')
             pylab.plot(xf,yfa, label='Normal Branch Fit')
         
-        return n_fit
+        return n_fit, norm_inds   # *
+        # return n_fit   # *
     
     def ivFitSuperconduct(self, vbias, vfb, vbias_offset, show_plot=False, ignore_nans=True):
         '''Fit the superconducting branch of the IV and return the slope and intercept. '''
@@ -102,7 +106,9 @@ class TESAnalyze2():
             pylab.plot(vbias_sc,vfb_sc_fit, label='SC Branch Fit')
             pylab.legend()
         
-        return sc_fit
+        return sc_fit, end_sc   # *
+        # return sc_fit   # *
+        
 
     def ivInterpolate(self, vtes, ites, rtes, percentRns, rn, tran_pRn_start=0.050):
       
@@ -148,12 +154,12 @@ class TESAnalyze2():
         Ks = np.zeros(len(pRn)); ns = np.zeros(len(pRn)); Tcs = np.zeros(len(pRn)); Gs = np.zeros(len(pRn))   # initialize arrays
         Ks_error = np.zeros(len(pRn)); ns_error = np.zeros(len(pRn)); Tcs_error = np.zeros(len(pRn))
         for index in range(len(pRn)):   # for each percent Rn
-            pfit, pcov = scipy.optimize.curve_fit(self.powerlaw_fit_func, temperatures, powerAtRns[index], p0=init_guess, sigma=sigma[index])   # non-linear least squares fit
+            pfit, pcov = curve_fit(self.powerlaw_fit_func, temperatures, powerAtRns[index], p0=init_guess, sigma=sigma[index], absolute_sigma=True)   # non-linear least squares fit
             Ks[index] = pfit[0]; ns[index] = pfit[1]; Tcs[index] = pfit[2]   # fit parameters
             perr = np.sqrt(np.diag(pcov)); Ks_error[index] = perr[0]; ns_error[index] = perr[1]; Tcs_error[index] = perr[2]   # error of fit
             temp_pnts = np.linspace(min(temperatures)-0.01,Tcs[index]+0.01,25)
             if plot:
-                pylab.errorbar(temperatures*1e3, powerAtRns[index]*1e12, xerr=0.5, yerr=sigma[index], fmt='o', label='Data', color=mcolors[index+6], alpha=0.8)   # matching data and model colors
+                pylab.errorbar(temperatures*1e3, powerAtRns[index]*1e12, xerr=sigma[index]*1e12, fmt='o', label='Data', color=mcolors[index+6], alpha=0.8)   # matching data and model colors
                 pylab.plot(temp_pnts*1e3, self.powerlaw_fit_func(temp_pnts, *pfit)*1e12, label='Power Law', color=mcolors[index+6], alpha=0.8)
                 # prepare confidence level curves
                 # pfit_up = pfit + nstd * perr; pfit_dw = pfit - nstd * perr
