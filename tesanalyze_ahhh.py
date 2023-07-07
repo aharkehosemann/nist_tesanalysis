@@ -137,19 +137,29 @@ class TESAnalyze():
         pylab.xlabel('VTES (mu)')
         pylab.ylabel('ITES (mA)') 
 
-    def fitPowerLaw(self, pRn, temperatures, powerAtRns, init_guess, fitToLast=True, TbsToReturn=[0.080,0.094,0.095], plot=True, suptitle='', sigma=None, nstd=1, pfigpath=None, constT=False, fitGexplicit=False):
+    def fitPowerLaw(self, pRn, temperatures, powerAtRns, init_guess, fitToLast=True, TbsToReturn=[0.080,0.094,0.095], plot=True, suptitle='', sigma=None, nstd=1, pfigpath=None, constT=False, fitGexplicit=False, fixedK=False, fixedn=False):
         '''Fit power versus T_base with power law.'''
 
         if plot is True:
             f1 = pylab.figure(figsize=(6,6))   # power law fit figure
-        fitfnct = self.powerlaw_fit_func2 if fitGexplicit else self.powerlaw_fit_func   # fit G explicitly?
-            
+        
+        if fitGexplicit:
+            fitfnct = self.tespowerlaw_fit_func_G 
+        elif fixedK:   # fix K, fit for n and Tc
+            fitfnct = lambda x, n, Tc: self.tespowerlaw_fit_func_k(x, fixedK, n, Tc)
+        elif fixedn:   # fix K, fit for n and Tc
+            fitfnct = lambda x, k, Tc: self.tespowerlaw_fit_func_k(x, k, fixedn, Tc)
+        else: 
+            fitfnct = self.tespowerlaw_fit_func_k
+        # pdb.set_trace()
         Ks = np.zeros(len(pRn)); ns = np.zeros(len(pRn)); Tcs = np.zeros(len(pRn)); GTcs = np.zeros(len(pRn))   # initialize arrays
         Ks_error = np.zeros(len(pRn)); ns_error = np.zeros(len(pRn)); Tcs_error = np.zeros(len(pRn)); GTcs_err = np.zeros(len(pRn))
         for index in range(len(pRn)):   # for each percent Rn, assumes constant T_TES that is very close to Tc
             if type(sigma) is np.ndarray: # measurement error included in fit
+                # pdb.set_trace()
                 p0, p0cov = curve_fit(fitfnct, temperatures, powerAtRns[index], p0=init_guess)   # get global p0 values by neglecting measurement errors first
                 pfit, pcov = curve_fit(fitfnct, temperatures, powerAtRns[index], p0=p0, sigma=sigma[index], absolute_sigma=True)   # non-linear least squares fit, set absolute_sigma=True to get true variance in pcov
+                # print(''); print(pcov); print('')
                 # pdb.set_trace()
             else: # don't include measurement error
                 pfit, pcov = curve_fit(fitfnct, temperatures, powerAtRns[index], p0=init_guess)   # non-linear least squares fit, set absolute_sigma=True to get true variance in pcov
@@ -157,6 +167,14 @@ class TESAnalyze():
             if fitGexplicit:
                 GTcs[index] = pfit[0]; ns[index] = pfit[1]; Tcs[index] = pfit[2]   # fit parameters
                 GTcs_err[index] = perr[0]; ns_error[index] = perr[1]; Tcs_error[index] = perr[2]   # error of fit parameters
+            elif fixedK:   # only fit n and Tc
+                Ks[index] = fixedK; Ks_error[index] = 0
+                ns[index] = pfit[0]; Tcs[index] = pfit[1]   # fit parameters
+                ns_error[index] = perr[0]; Tcs_error[index] = perr[1]   # error of fit parameters               
+            elif fixedn:   # only fit n and Tc
+                ns[index] = fixedn; ns_error[index] = 0
+                Ks[index] = pfit[0]; Tcs[index] = pfit[1]   # fit parameters
+                Ks_error[index] = perr[0]; Tcs_error[index] = perr[1]   # error of fit parameters 
             else:
                 Ks[index] = pfit[0]; ns[index] = pfit[1]; Tcs[index] = pfit[2]   # fit parameters
                 Ks_error[index] = perr[0]; ns_error[index] = perr[1]; Tcs_error[index] = perr[2]   # error of fit parameters
@@ -169,7 +187,7 @@ class TESAnalyze():
                 pylab.plot(temp_pnts*1e3, fitfnct(temp_pnts, *pfit)*1e12, label='{}% Rn'.format(pRn[index]), color=pylab.cm.viridis(pRn[index]/100-0.05), alpha=0.8)
                 # prepare confidence level curves
                 # pfit_up = pfit + nstd * perr; pfit_dw = pfit - nstd * perr
-                # fit_up = self.powerlaw_fit_func(temp_pnts, *pfit_up); fit_down = self.powerlaw_fit_func(temp_pnts, *pfit_dw)
+                # fit_up = self.tespowerlaw_fit_func_k(temp_pnts, *pfit_up); fit_down = self.tespowerlaw_fit_func_k(temp_pnts, *pfit_dw)
                 # pylab.fill_between(temp_pnts*1e3, fit_down*1e12, fit_up*1e12, alpha=.3, label='{}-sigma interval'.format(nstd), color=mcolors[index+6])
         if plot:
             pylab.legend()
@@ -219,9 +237,9 @@ class TESAnalyze():
             pylab.title('n')
             pylab.ylabel('n')
             p3 = f2.add_subplot(2,2,3)
-            p3.errorbar(pRn, Tcs*1E3, yerr=Tcs_error*1E3, fmt='o', label='constant T', alpha=0.7)
             for tt in tsort:
                 p3.errorbar(pRn, Ttes[tt]*1E3, yerr=Ttes_error[tt]*1E3, fmt='o', label='{:.1f} mK'.format(Tbs[tt]*1e3), alpha=0.7, color=pylab.cm.plasma((Tbs[tt]-min(Tbs)*1)/(max(Tbs)*0.8)))
+            p3.errorbar(pRn, Tcs*1E3, yerr=Tcs_error*1E3, fmt='o', label='constant T', alpha=0.7, color='k')
             pylab.title('$T_{TES}$')
             pylab.xlabel('% $R_n$')
             pylab.ylabel('$T_{TES}}$ [$mK$]')  
@@ -233,9 +251,9 @@ class TESAnalyze():
                 print('Legend error')
                 
             p4 = f2.add_subplot(2,2,4)
-            p4.errorbar(pRn, GTcs*1e12, yerr=GTcs_err*1E12, fmt='o', label='constant T', alpha=0.7)
             for tt in tsort:
                 p4.errorbar(pRn, GTbs[tt]*1e12, yerr=GTbs_err[tt]*1E12, fmt='o',label='{:.1f} mK'.format(Tbs[tt]*1e3), alpha=0.7, color=pylab.cm.plasma((Tbs[tt]-min(Tbs)*1)/(max(Tbs)*0.8)))
+            p4.errorbar(pRn, GTcs*1e12, yerr=GTcs_err*1E12, fmt='o', label='constant T', alpha=0.7, color='k')
             pylab.title('G')
             pylab.xlabel('% $R_n$')
             pylab.ylabel('G [pW/K]')
@@ -257,11 +275,12 @@ class TESAnalyze():
 #************************
 
 
-    def powerlaw_fit_func(self, x, k, n, Tc):
+    def tespowerlaw_fit_func_k(self, x, k, n, Tc):
         return k*(Tc**n-np.power(x,n))   # P = kappa * (T^n - x^n)
     
-    def powerlaw_fit_func2(self, x, G, n, Tc):
+    def tespowerlaw_fit_func_G(self, x, G, n, Tc):
         return G/n * Tc *(1-np.power(x/Tc,n))   # P = G/n * Tc * (1 - (Tb/Tc)^n)
+
 
     # def powerlaw_err_func(self, k, n, Tc, x, y):  
     #     return y - self.powerlaw_fit_func(p,x) 

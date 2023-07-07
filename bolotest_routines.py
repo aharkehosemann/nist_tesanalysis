@@ -11,6 +11,8 @@ planck = hbar*2*np.pi   # planck's constant , [J s]
 G0 = np.pi**2*kB**2*0.170/(3*planck)*1E12   # an inherent G at 170 mK; pW/K
 bolos=np.array(['bolo 1b', 'bolo 24', 'bolo 23', 'bolo 22', 'bolo 21', 'bolo 20', 'bolo 7', 'bolo 13'])   # this is just always true
 mcolors = plt.rcParams['axes.prop_cycle'].by_key()['color']*5   # iterate through matplotlib default colors
+L = 220   # TES leg length, um
+A_U = 7*420E-3; A_W = 5*400E-3; A_I = 7*400E-3  # Area of film on one leg,um^2
 
 ### Supporting Functions
 
@@ -190,18 +192,16 @@ def sigma_GscaledT(T, GTc, Tc, n, sigma_GTc, sigma_Tc, sigma_n):
     nterm = sigma_n * GTc * (T/Tc)**(n-1) * np.log(T/Tc)
     return np.sqrt( Gterm**2 + Tcterm**2 + nterm**2)   # quadratic sum of sigma G(Tc), sigma Tc, and sigma_n terms
 
-def WLS_val(params, data, model='default'):   # calculates error-weighted least squares
+def chisq_val(params, data, model='default'):   # calculates chi-squared value
     ydata, sigma = data
     if model=='default':
         Gbolos_model = Gbolos(params)   # predicted G of each bolo
     elif model=='six_layers':   # model SiOx as it's own layer
         Gbolos_model = Gbolos_six(params)
-    WLS_vals = (Gbolos_model-ydata)**2/sigma**2
+    chisq_vals = (Gbolos_model-ydata)**2/sigma**2
 
-    return np.sum(WLS_vals) 
+    return np.sum(chisq_vals) 
 
-def calc_chisq(obs, expect):
-    return np.sum((obs-expect)**2/expect)
 
 def Gbolos(params):   
     GU, GW, GI, aU, aW, aI = params
@@ -240,10 +240,10 @@ def calc_func_grid(params, data):   # chi-squared parameter space
     for rr, row in enumerate(params): 
         for cc, col in enumerate(row):
             params_rc = col            
-            func_grid[rr, cc] = WLS_val(params_rc, data)
+            func_grid[rr, cc] = chisq_val(params_rc, data)
     return func_grid
 
-def runsim_WLS(num_its, p0, data, bounds, plot_dir, show_yplots=False, save_figs=False, fn_comments='', save_sim=False, sim_file=None, model='default'):  
+def runsim_chisq(num_its, p0, data, bounds, plot_dir, show_yplots=False, save_figs=False, fn_comments='', save_sim=False, sim_file=None, model='default'):  
     # returns G and alpha fit parameters
     # returned G's have units of ydata (most likely pW/K)
 
@@ -255,7 +255,7 @@ def runsim_WLS(num_its, p0, data, bounds, plot_dir, show_yplots=False, save_figs
     Gwires = np.empty((num_its, 1))
     for ii in np.arange(num_its):   # run simulation
         y_its[ii] = np.random.normal(ydata, sigma)   # pull G's from normal distribution characterized by fit error
-        it_result = minimize(WLS_val, p0, args=[y_its[ii], sigma], bounds=bounds)
+        it_result = minimize(chisq_val, p0, args=[y_its[ii], sigma], bounds=bounds)
         pfits_sim[ii] = it_result['x']
         Gwires[ii] = Gfrommodel(pfits_sim[ii], 0.420, 7, 220, layer='wiring', fab='bolotest')[0,0]/4   # function outputs G for four legs worth of microstrip
 
@@ -275,7 +275,7 @@ def runsim_WLS(num_its, p0, data, bounds, plot_dir, show_yplots=False, save_figs
     Uerr_sim, Werr_sim, Ierr_sim, aUerr_sim, aWerr_sim, aIerr_sim = sim_std   # parameter errors from Monte Carlo Function Minimization
     Gwire = np.mean(Gwires); Gwire_std = np.std(Gwires)
 
-    print('Results from Monte Carlo Sim - WLS Min')
+    print('Results from Monte Carlo Sim - chisq Min')
     print('G_U(420 nm) = ', round(U_sim, 2), ' +/- ', round(Uerr_sim, 2), 'pW/K')
     print('G_W(400 nm) = ', round(W_sim, 2), ' +/- ', round(Werr_sim, 2), 'pW/K')
     print('G_I(400 nm) = ', round(I_sim, 2), ' +/- ', round(Ierr_sim, 2), 'pW/K')
@@ -306,16 +306,25 @@ def runsim_WLS(num_its, p0, data, bounds, plot_dir, show_yplots=False, save_figs
     return sim_params, sim_std
 
 
-def qualityplots(data, sim_results, plot_dir='./', save_figs=False, fn_comments='', vmax=500, figsize=(17,5.75), title=''):
-    ### plot WLS values in 2D parameter space (alpha_x vs G_x) overlayed with resulting parameters from simulation for all three layers
+def qualityplots(data, sim_dict, plot_dir='./', save_figs=False, fn_comments='', vmax=500, figsize=(17,5.75), title='', print_results=True, calc='mean'):
+    ### plot chisq values in 2D parameter space (alpha_x vs G_x) overlayed with resulting parameters from simulation for all three layers
+    # params can be either the mean or median of the simulation values
 
     layers = np.array(['U', 'W', 'I'])
-    fit_params = sim_results[0]; fit_errs = sim_results[1]   # fit parameters and errors
+    sim_data = sim_dict['sim']
+    Gwires = sim_dict['Gwires']
+
+    # calculate the fit params as either the mean or median of the simulation values
+    if calc == 'mean':
+        fit_params, fit_errs = [np.mean(sim_data, axis=0), np.std(sim_data, axis=0)]   # take mean values
+        Gwire = np.mean(Gwires); sigma_Gwire = np.std(Gwires)
+    if calc == 'median':
+        fit_params, fit_errs = [np.median(sim_data, axis=0), np.std(sim_data, axis=0)]   # take median values to avoid outliers
+        Gwire = np.median(Gwires); sigma_Gwire = np.std(Gwires)
 
     xgridlim=[0,2]; ygridlim=[0,2]   # alpha_layer vs G_layer 
-    xgrid, ygrid = np.mgrid[xgridlim[0]:xgridlim[1]:100j, ygridlim[0]:ygridlim[1]:100j]   # make 2D grid for plotter
-
-    wspace=.25
+    xgrid, ygrid = np.mgrid[xgridlim[0]:xgridlim[1]:150j, ygridlim[0]:ygridlim[1]:150j]   # make 2D grid for plotter
+    wspace = 0.25
 
     fig = plt.figure(figsize=figsize)   # initialize figure
     fig.subplots_adjust(wspace=wspace, left=0.065)
@@ -336,30 +345,47 @@ def qualityplots(data, sim_results, plot_dir='./', save_figs=False, fn_comments=
             gridparams = np.array([fit_params[0]*np.ones_like(xgrid), fit_params[1]*np.ones_like(xgrid), xgrid, fit_params[3]*np.ones_like(ygrid), fit_params[4]*np.ones_like(ygrid), ygrid]).T
             splot_ID = '\\textbf{iii.}'
 
-        funcgrid = calc_func_grid(gridparams, data)   # calculate WLS values for points in the grid
-        ticks = np.array([0,0.5,1,1.5,2])
+        funcgrid = calc_func_grid(gridparams, data)   # calculate chisq values for points in the grid
         ax = fig.add_subplot(1,3,ll+1)   # select subplot
-        # ax = plt.subplot(gs[ll])   # select subplot
         im = plt.imshow(funcgrid, cmap=plt.cm.RdBu, vmin=0, vmax=vmax, extent=[min(xgridlim), max(xgridlim), min(ygridlim), max(ygridlim)], origin='lower', alpha=0.6)   # quality plot
         plt.errorbar(fit_params[Gind], fit_params[aind], xerr=fit_errs[Gind], yerr=fit_errs[aind], color='black', label='\\textbf{Model Fit}', capsize=2, linestyle='None')   # fit results
-        plt.xlabel(xlab)
-        plt.ylabel(ylab)
-        plt.xticks(ticks)
-        plt.yticks(ticks)
+        plt.xlabel(xlab); plt.ylabel(ylab)
         plt.xlim(xgridlim[0], xgridlim[1]); plt.ylim(ygridlim[0], ygridlim[1])
         plt.annotate(splot_ID, (0.1, 1.825), bbox=dict(boxstyle="square,pad=0.3", fc='w', ec='k', lw=1))
         if ll==2: 
             axpos = ax.get_position()
-            cax = fig.add_axes([axpos.x1+0.02, axpos.y0+0.04, 0.01, axpos.y1-axpos.y0-0.08], label='\\textbf{WLS Value}')
+            cax = fig.add_axes([axpos.x1+0.02, axpos.y0+0.04, 0.01, axpos.y1-axpos.y0-0.08], label='\\textbf{Chi-Sq Value}')
             cbar = fig.colorbar(im, cax=cax)
-            cbar.set_label('\\textbf{WLS Value}', rotation=270, labelpad=15)
+            cbar.set_label('$\\boldsymbol{\\chi^2\\textbf{ Value}}$', rotation=270, labelpad=20)
             # ax.legend(loc='lower left')
             # ax.legend(loc=(0.075,0.75))
             ax.legend(loc=(0.1,0.15))
-    plt.suptitle(title, fontsize=20, y=0.94)
-
+    plt.suptitle(title, fontsize=20, y=0.86)
     if save_figs: plt.savefig(plot_dir + 'qualityplots' + fn_comments + '.png', dpi=300)   # save figure
-    return 
+
+    if print_results:
+        ### print results
+        GmeasU, GmeasW, GmeasI, alphaU, alphaW, alphaI = fit_params; sigGU, sigGW, sigGI, sigalphaU, sigalphaW, sigalphaI = fit_errs
+        print ('\n\nResults taking '+ calc +' values of fit parameters:')
+        print('G_U(420 nm) = ', round(GmeasU, 2), ' +/- ', round(sigGU, 2), 'pW/K')
+        print('G_W(400 nm) = ', round(GmeasW, 2), ' +/- ', round(sigGW, 2), 'pW/K')
+        print('G_I(400 nm) = ', round(GmeasI, 2), ' +/- ', round(sigGI, 2), 'pW/K')
+        print('alpha_U = ', round(alphaU, 2), ' +/- ', round(sigalphaU, 2))
+        print('alpha_W = ', round(alphaW, 2), ' +/- ', round(sigalphaW, 2))
+        print('alpha_I = ', round(alphaI, 2), ' +/- ', round(sigalphaI, 2))
+        print('')
+        kappaU = GtoKappa(GmeasU, A_U, L); sigkappaU = GtoKappa(sigGU, A_U, L)   # pW / K / um; error analysis is correct because kappa(G) just depends on constants
+        kappaW = GtoKappa(GmeasW, A_W, L); sigkappaW = GtoKappa(sigGW, A_W, L)   # pW / K / um; error analysis is correct because kappa(G) just depends on constants
+        kappaI = GtoKappa(GmeasI, A_I, L); sigkappaI = GtoKappa(sigGI, A_I, L)   # pW / K / um; error analysis is correct because kappa(G) just depends on constants
+        print('Kappa_U: ', round(kappaU, 2), ' +/- ', round(sigkappaU, 2), ' pW/K/um')
+        print('Kappa_W: ', round(kappaW, 2), ' +/- ', round(sigkappaW, 2), ' pW/K/um')
+        print('Kappa_I: ', round(kappaI, 2), ' +/- ', round(sigkappaI, 2), ' pW/K/um')
+        print('G_wire = ', round(Gwire, 2), ' +/- ', round(sigma_Gwire, 2), 'pW/K')
+
+        chisq_fit = chisq_val(fit_params, data)
+        print('Chi-squared value for the fit: ', round(chisq_fit, 3)) 
+
+    return fit_params, fit_errs, [kappaU, kappaW, kappaI], [sigkappaU, sigkappaW, sigkappaI], Gwire, sigma_Gwire, chisq_fit
 
 def phonon_wlength(vs, T, domcoeff=2.82):   # returns dominant phonon wavelength in vel units * s (probably um)
     # dominant coefficient takes different values in the literature
@@ -406,6 +432,92 @@ def kappa_permfp(T, material=''):   # Leopold and Boorse 1964, Nb
 
     return kappapmfp   
 
+
+def pairwise(sim_dataT, labels, title='', plot_dir='./', fn_comments='', save_figs=False, indstp=[]):
+    # make pairwise correlation plots with histograms on the diagonal 
+    # sim_data needs to be transposed so that it's 6 x number of iterations
+
+    sim_data = sim_dataT.T
+    if len(indstp)==0: indstp = np.arange(np.shape(sim_data)[1])   # allow for plotting subsections of simulation data 
+    ndim = len(sim_data); nsolns = len(indstp)   # number of dimensions and simulation solutions
+
+    limpad = np.array([max(sim_data[pp][indstp])-min(sim_data[pp][indstp]) for pp in np.arange(len(sim_data))])*0.10   # axis padding for each parameter
+    limits = np.array([[min(sim_data[pp][indstp])-limpad[pp], max(sim_data[pp][indstp])+limpad[pp]] for pp in np.arange(len(sim_data))])   # axis limits for each parameter
+    histlim = [1,1E4]
+
+    pairfig = plt.figure()
+    for ii in np.arange(ndim):   # row
+        for jj in range(ndim):   # column
+            spind = ii*ndim+jj+1   # subplot index, starts at 1
+            ax = pairfig.add_subplot(ndim, ndim, spind)
+            if ii == jj:   # histograms on the diagonal
+                ax.hist(sim_data[ii][indstp], bins=30, label=labels[ii], color='C1')
+                ax.set_yscale('log')
+                ax.yaxis.set_ticks([1E1, 1E2, 1E3, 1E4])
+                ax.set_xlim(limits[ii]); ax.set_ylim(histlim)
+                ax.set_xlabel(labels[jj]); ax.set_ylabel(labels[ii])
+            else:           
+            # elif jj<=ii:   # scatter plots on off-diagonal 
+                ax.scatter(sim_data[jj][indstp], sim_data[ii][indstp], marker='.', alpha=0.3)   # row shares the y axis, column shares the x axis
+                ax.set_xlim(limits[jj]); ax.set_ylim(limits[ii])
+                ax.set_xlabel(labels[jj]); ax.set_ylabel(labels[ii])
+
+    for ax in pairfig.get_axes():   # only label bottom and left side
+        ax.label_outer()
+    plt.suptitle(title+' - N='+str(nsolns), fontsize=20, y=0.93)
+
+    if save_figs: plt.savefig(plot_dir + 'pairwiseplots' + fn_comments + '.png', dpi=300)   # save figure
+
+
+
+    return pairfig
+
+
+def plot_meanqp(p0, data, n_its, param, plot_dir, savefigs=False, fn_comments=''):
+
+    if param == 'U' or param=='W' or param=='I':
+        xgridlim=[0,3]; ygridlim=[0,2]   # alpha_layer vs G_layer 
+        xgrid, ygrid = np.mgrid[xgridlim[0]:xgridlim[1]:100j, ygridlim[0]:ygridlim[1]:100j]
+        xlab = 'G'+param  
+        if param=='U': 
+            gridparams = np.array([xgrid, p0[1]*np.ones_like(xgrid), p0[2]*np.ones_like(xgrid), ygrid, p0[4]*np.ones_like(ygrid), p0[5]*np.ones_like(ygrid)]).T
+            ylab = 'a$_U$'
+        elif param=='W': 
+            gridparams = np.array([p0[0]*np.ones_like(xgrid), xgrid, p0[2]*np.ones_like(xgrid), p0[3]*np.ones_like(ygrid), ygrid, p0[5]*np.ones_like(ygrid)]).T
+            ylab = 'a$_W$'
+        elif param=='I': 
+            gridparams = np.array([p0[0]*np.ones_like(xgrid), p0[1]*np.ones_like(xgrid), xgrid, p0[3]*np.ones_like(ygrid), p0[4]*np.ones_like(ygrid), ygrid]).T
+            ylab = 'a$_I$'
+
+    funcgrid = calc_func_grid(gridparams, data)
+
+    plt.figure()   # G vs alpha parameter space, single run 
+    im = plt.imshow(funcgrid, cmap=plt.cm.RdBu, vmin=0, vmax=1E3, extent=[min(xgridlim), max(xgridlim), min(ygridlim), max(ygridlim)], origin='lower') 
+    plt.colorbar(im)
+    plt.title('Function Values in 2D Param Space')
+    plt.xlabel(xlab)
+    plt.ylabel(ylab)
+    if savefigs: plt.savefig(plot_dir + 'funcqualityplot_' + param + fn_comments + '.png', dpi=300)
+
+    funcgridU_sim = np.empty((n_its, len(funcgrid[0]), len(funcgrid[1])))
+    y_its = np.empty((n_its, len(ydata)))
+    for ii in np.arange(n_its):   # run simulation
+        y_its[ii] = np.random.normal(ydata, sigma)   # pull G's from normal distribution characterized by fit error
+        data_it = [y_its[ii], sigma]   
+        funcgridU_sim[ii] = calc_func_grid(gridparams, data_it)   # calculate function value with simulated y-data
+
+    funcgrid_mean = np.mean(funcgridU_sim, axis=0)
+
+    plt.figure()   # G vs alpha parameter space
+    im = plt.imshow(funcgrid_mean, cmap=plt.cm.RdBu, vmin=0, vmax=1E3, extent=[min(xgridlim), max(xgridlim), min(ygridlim), max(ygridlim)], origin='lower', alpha=0.8) 
+    plt.colorbar(im)
+    plt.xlabel(xlab)
+    plt.ylabel(ylab)
+    plt.title('Mean Func Vals, N$_{its}$ = %d'%n_its) 
+    # plt.xlim(xgridlim[0], xgridlim[1]); plt.ylim(ygridlim[0], ygridlim[1])
+    if savefigs: plt.savefig(plot_dir + 'meanfuncqualityplot_' + param + fn_comments + '.png', dpi=300)
+
+    return funcgrid, funcgrid_mean
 
 def I_mfp(x):
     return x/2 * np.arcsinh(x) + 1/6*((1+x**2)**(1/2) * (x**2-2) + (2-x**3))
