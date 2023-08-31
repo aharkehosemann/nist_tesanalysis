@@ -5,6 +5,7 @@ from scipy.optimize import curve_fit
 import pylab
 import pdb
 from collections import OrderedDict
+import pickle as pkl
 
 """ 
 Adapted from Doug Bennett's TES IV analysis module, now with error analysis!
@@ -17,110 +18,204 @@ Set absolute_sigma=True to get true error.
 kB = 1.3806503e-23   # Boltzmann constant
 mcolors = pylab.rcParams['axes.prop_cycle'].by_key()['color']*5   # iterate through matplotlib default colors
 
+# map pad number to bolo id
+pad_bolo_map = {'1':'1f', '2':'1e', '3':'1d', '4':'1c', '5':'1b', '6':'1a', '7':'1f', '8':'1e', '9':'1d', '10':'1c', '11':'1b', '12':'1a', 
+                '13':'24', '14':'23', '15':'22', '16':'13', '17':'21', '18':'20', '19':'24', '20':'23', '21':'22', '22':'13', '23':'21', 
+                '24':'20','25':'7','26':'26','27':'27','28':'7','29':'26','30':'27'}
+
+# readout circuit parameters
+M_r = 8.5   # (SQUID-input coupling: current = arbs / (M_r * R_fb))
+Rfb = 2070.   # Ohms (SQUID feeback resistor), Kelsey: accurate to ~5%
+Rsh = 370.e-6   # microOhms (bias circuit shunt), Kelsey: accurate to 10-15%
+Rb = 1020.   # Ohms (TES bias resistor), Kelsey: accurate to ~5%
+
 class TESAnalyze():
     '''
     Analysis functions
     '''
 
-    def ivAnalyzeTDM(self, vbias, vfb, rfb, rbias, rsh, mr, v_nfit, rpar=None, vbias_offset=0.0,
+    def ivAnalyzeTDM(self, Vbias, Vfb, rfb, rbias, rsh, mr, v_nfit, rpar=None, Vbias_offset=0.0,
                      i_offset=0.0, show_plot=False, ignore_nans=True):
         '''Fit supeconducting and normal branches and use information to convert raw data to IV.'''
 
-        vb_step = vbias[1]-vbias[0]
+        vb_step = Vbias[1]-Vbias[0]
         if vb_step < 0:   # reverse order if data was taken from high V -> 0
-            vbias = vbias[::-1]
-            vfb = vfb[::-1] 
-        n_output = self.ivFitNormal(vbias, vfb, vbias_offset, v_nfit, show_plot=show_plot) 
+            Vbias = Vbias[::-1]
+            Vfb = Vfb[::-1] 
+        if show_plot: rawIVfig = pylab.figure()
+        n_output = self.ivFitNormal(Vbias, Vfb, Vbias_offset, v_nfit, show_plot=show_plot) 
         n_fit = n_output[0]; norm_inds = n_output[1]   
-        if n_fit[0] < 0:
-            vfb = -vfb
-            n_output = self.ivFitNormal(vbias, vfb, vbias_offset, v_nfit, show_plot=show_plot)  
-            n_fit = n_output[0]; norm_inds = n_output[1] 
-        normal_offset = n_fit[1]
-        sc_fit, end_sc = self.ivFitSuperconduct(vbias, vfb, vbias_offset, show_plot=show_plot, ignore_nans=ignore_nans)  
-        m_sc = sc_fit[0]
-        if rpar is None:
-            rpar = rsh*(rfb*mr/(rbias*m_sc)-1.0)
-        vtes, ites, rtes, ptes, i_meas = self.ivConvertTDM(vbias, vfb, rfb, rbias, rsh, mr, rpar, normal_offset, vbias_offset, i_offset)
-        
-        return vtes, ites, rtes, ptes, i_meas, n_fit, norm_inds, sc_fit, end_sc, rpar  
+        pylab.show()
+        pdb.set_trace()
+        # m_norm = n_fit[0]
+        # diff_norm = m_norm*np.diff(Vbias)[0]
 
-    def ivConvertTDM(self, vbias, vfb, rfb, rbias, rsh, mr, rpar, normal_offset, vbias_offset=0.0, i_offset=0.0):
+        # # pdb.set_trace()
+        # end_sc = None
+        # fb_diff = np.diff(Vfb)
+        # # slope = np.diff(Vfb)/np.diff(Vbias)
+        # # diff_slope = np.diff(slope)
+        # diff_sc = np.nanmean(fb_diff[0:5])   # assumes the first 5 data points are in the SC branch
+        # # discs = np.where(np.abs(slope)/np.abs(m_norm) > 1.5)[0]
+        # # pdb.set_trace()
+        # discs = np.where(np.abs(fb_diff/diff_sc) > 1.2)[0]
+    
+        # discs = discs[np.insert(np.diff(discs) != 1, 0, True)]   # remove sequential data points
+        # end_sc = discs[0]
+        # noslope = np.where(np.abs(fb_diff[:discs[-1]]/diff_norm)<=0.1)[0]
+        # finds = []
+        # # print(Vbias[discs])
+        # # pdb.set_trace()
+        # if len(noslope)!=0:
+        #     # finds = np.concatenate([finds, noslope[~np.isin(noslope, finds)]]).astype(int)
+        #     # finds = np.concatenate([discs[1]+1, noslope]).astype(int)
+        #     finds = np.arange(min(noslope), discs[-1]+1)
+        # if len(discs)>1:   # ignore flagged data points
+        #     # discs = np.where((np.abs(fb_diff)/np.abs(diff_sc) > 1.5) & (np.abs(np.diff(Vfb))<np.max(np.abs(np.diff(Vfb)))))[0]
+        #     finds_temp = np.arange(discs[0]+1, discs[1]+1)
+        #     finds = np.concatenate([finds, finds_temp[~np.isin(finds_temp, finds)]]).astype(int)
+        # if show_plot:
+        #     pylab.plot(Vbias[:-1], np.abs(np.diff(Vfb)/diff_norm)*1E-3, alpha=0.5)
+        #     pylab.plot(Vbias[:-1], np.abs(np.diff(Vfb)/diff_sc)/10, alpha=0.5)
+        #     pylab.plot(Vbias, Vfb, '.')
+        #     pylab.plot(Vbias[finds], Vfb[finds], 'x')
+        #     # pylab.show()
+        # # pdb.set_trace()
+        # Vfb[finds] = np.nan        # pylab.plot(Vbias[end_sc], Vfb[end_sc], 'o')
+        # # pylab.show()
+        # pdb.set_trace()
+
+        if n_fit[0] < 0:   # Flip y axis if slope of normal branch is negative
+            # Vfb = -Vfb   
+            Vfb = -Vfb + max(Vfb)   # flip and move to positive quadrant
+            if show_plot: rawIVfig.clear(True)
+            n_output = self.ivFitNormal(Vbias, Vfb, Vbias_offset, v_nfit, show_plot=show_plot)  
+            n_fit = n_output[0]; norm_inds = n_output[1] 
+            
+        normal_offset = n_fit[1] 
+
+        # sc_fit, end_sc = self.ivFitSuperconduct(Vbias, Vfb, Vbias_offset, show_plot=False, end_sc=end_sc)  
+        sc_fit, end_sc = self.ivFitSuperconduct(Vbias, Vfb, Vbias_offset, show_plot=show_plot)  
+        m_sc = sc_fit[0]; sc_offset = sc_fit[1]
+        
+        # pylab.show()
+        # pdb.set_trace()
+        # exclude flagged data points where Vfb is set to -1
+        # fb_diff = np.diff(Vfb)
+        # diff_sc = np.max(fb_diff[:end_sc-3])
+        
+        # etinds = np.arange(end_sc, end_sc+10)
+        # finds = np.where(fb_diff>diff_sc)
+        # finds = np.where(((Vfb[:-1]>0.95) & (Vfb[:-1]<1.1) & (Vbias[:-1]>Vbias[end_sc-1])) | (fb_diff>diff_sc))[0]   # remove flagged data points
+        # finds = np.where(((Vfb[:-1]>0.95) & (Vfb[:-1]<1.5) & (Vbias[:-1]>Vbias[end_sc-1])) | (fb_diff>diff_sc))[0]   # remove flagged data points
+        # if show_plot: 
+        #     pylab.plot(Vbias[finds], Vfb[finds], 'x', label='flagged data points')
+        #     pylab.plot(Vbias[:-1], fb_diff/max(fb_diff)*max(Vbias))
+        # Vfb[finds] = np.nan; Vbias[finds] = np.nan   # ignore flagged data points 
+
+        # if show_plot: pylab.plot(Vbias[finds], Vfb[finds], 'x')
+
+        # if len(finds)>0:
+        #     # print(end_sc)
+        #     end_sc = min([end_sc, min(finds)])
+        #     # print(end_sc)
+        #     Vfb[:end_sc] = Vfb[:end_sc] - sc_offset + normal_offset   # adjust for SC branch offset
+        # else:
+        #     Vfb[:end_sc-1] = Vfb[:end_sc-1] - sc_offset + normal_offset   # adjust for SC branch offset
+        # pylab.show()
+        # pdb.set_trace()
+
+
+        Vfb[:end_sc] = Vfb[:end_sc] - sc_offset + normal_offset   # adjust for SC branch offset, include last superconducting point
+        
+        if show_plot: pylab.plot(Vbias, Vfb, '.', label='after offset adjustments', alpha=0.5); pylab.legend()
+        # pylab.show()
+        
+
+        if rpar is None:   # calculate Rparasitic
+            rpar = rsh*(rfb*mr/(rbias*m_sc)-1.0)
+        Vtes, Ites, Rtes, Ptes, i_meas = self.ivConvertTDM(Vbias, Vfb, rfb, rbias, rsh, mr, rpar, normal_offset, Vbias_offset, i_offset)
+        ninds = np.where(Ites<0)   # where is current still negative?
+        Vtes[ninds] = np.nan; Ites[ninds] = np.nan; Rtes[ninds] = np.nan; Ptes[ninds] = np.nan; i_meas[ninds] = np.nan
+
+
+        return Vtes, Ites, Rtes, Ptes, i_meas, n_fit, norm_inds, sc_fit, end_sc, rpar  
+
+    def ivConvertTDM(self, Vbias, Vfb, rfb, rbias, rsh, mr, rpar, normal_offset, Vbias_offset=0.0, i_offset=0.0):
         '''Convert IV data.'''
-        
-        vb_step = vbias[1]-vbias[0]
+        vb_step = Vbias[1]-Vbias[0]
         if vb_step < 0:
-            vbias = vbias[::-1]
-            vfb = vfb[::-1] 
-        i_meas = (vfb-normal_offset)/(rfb*mr) + i_offset
-        ites = i_meas - i_offset
-        i_bias = (vbias-vbias_offset)/rbias
-        vtes = (i_bias-i_meas)*rsh-i_meas*rpar
-        rtes = vtes/ites
-        ptes = vtes*ites
+            Vbias = Vbias[::-1]
+            Vfb = Vfb[::-1] 
+        i_meas = (Vfb-normal_offset)/(rfb*mr) + i_offset   # current measured by the SQ?
+        Ites = i_meas - i_offset   # current through the TES measured by the SQ?
+        i_bias = (Vbias-Vbias_offset)/rbias   # TES bias current
+        Vtes = (i_bias-i_meas)*rsh-i_meas*rpar
+        Rtes = Vtes/Ites
+        Ptes = Vtes*Ites
         
-        return  vtes, ites, rtes, ptes, i_meas
+        return  Vtes, Ites, Rtes, Ptes, i_meas
         
     
-    def ivFitNormal(self, vbias, vfb, vbias_offset, v_nfit, show_plot=False):
+    def ivFitNormal(self, Vbias, Vfb, Vbias_offset, v_nfit, show_plot=False):
         '''Fit the normal branch of the IV.'''
 
-        x = vbias-vbias_offset
-        y = vfb
+        x = Vbias-Vbias_offset
+        y = Vfb
         norm_inds = np.where(x>v_nfit)
         m_a, b_a = np.polyfit(x[norm_inds], y[norm_inds], 1)
         n_fit = [m_a, b_a]
         xf = x[norm_inds]
         yfa = xf*m_a+b_a
         if show_plot is True:
-            pylab.figure()
             pylab.plot(x,y,'.', label='Data')
             pylab.plot(xf,yfa, label='Normal Branch Fit')
         
         return n_fit, norm_inds   
     
-    def ivFitSuperconduct(self, vbias, vfb, vbias_offset, show_plot=False, ignore_nans=True):
+    def ivFitSuperconduct(self, Vbias, Vfb, Vbias_offset, show_plot=False, end_sc=None):
         '''Fit the superconducting branch of the IV and return the slope and intercept. '''
 
-        fb_diff = np.diff(vfb)
-        nan_indicies = np.where(np.isnan(vfb))
-        if len(nan_indicies[0]) > 0 and ignore_nans==False:
-            # transition data is at values larger than the NaNs, set ignore_nans to False to turn this on
-            print('not igonring nans')
-            end_sc = int(min(nan_indicies[0])-1)
-        else:       
+        if end_sc==None:   # find end of SC branch if not already given
+            fb_diff = np.diff(Vfb)
             neg_slope_array = np.where(fb_diff<0)
-            end_sc =  min(neg_slope_array[0]) - 2 # Go down two points to get away from the edge
-        vbias_sc = vbias[:end_sc] - vbias_offset
-        vfb_sc = vfb[:end_sc]
-        sc_m, sc_b = scipy.polyfit(vbias_sc, vfb_sc, 1)
-        vfb_sc_fit = scipy.polyval([sc_m,sc_b],vbias_sc)
+            # where is slope negative 10x in a row?
+            end_sc =  min(neg_slope_array[0])  
+        Vbias_sc = Vbias[:end_sc+1] - Vbias_offset
+        Vfb_sc = Vfb[:end_sc+1]
+
+        finds = np.isfinite(Vfb_sc)   # ignore nans
+        sc_m, sc_b = scipy.polyfit(Vbias_sc[finds], Vfb_sc[finds], 1)
+        Vfb_sc_fit = scipy.polyval([sc_m,sc_b],Vbias_sc)
         sc_fit = [sc_m, sc_b]
         if show_plot is True:
-            pylab.plot(vbias_sc,vfb_sc_fit, label='SC Branch Fit')
+            pylab.plot(Vbias_sc,Vfb_sc_fit, label='SC Branch Fit')
             pylab.legend()
         
         return sc_fit, end_sc   
         
 
-    def ivInterpolate(self, vtes, ites, rtes, percentRns, rn, tran_pRn_start=0.050, plot=False):
+    def ivInterpolate(self, Vtes, Ites, Rtes, percentRns, rn, tran_pRn_start=0.050, plot=False):
       
-        btran_indices = np.where((rtes/rn)<tran_pRn_start)
+        btran_indices = np.where((Rtes/rn)<tran_pRn_start)
         if len(btran_indices[0]) == 0:   # check for normal IVs, this throws off the interpolator
             print('TES is normal, interpolator failed')
             return None, None, None
         tran_start = np.max(btran_indices)
-        vtes_tran = vtes[tran_start:]
-        ites_tran = ites[tran_start:]
-        rtes_tran = rtes[tran_start:]
+        Vtes_tran = Vtes[tran_start:]
+        Ites_tran = Ites[tran_start:]
+        Rtes_tran = Rtes[tran_start:]
         # Check that the r data being used for interpolation is monotonically increasing
-        if np.all(np.diff(rtes_tran) > 0) is False:
+        if np.all(np.diff(Rtes_tran) > 0) is False:
             print('IV %s not monotomicaly increasing in R')
         # Find the I and V that corespond to the requested percent Rns
-        v_pnts = np.interp(percentRns/100.0*rn, rtes_tran, vtes_tran)
-        i_pnts = np.interp(percentRns/100.0*rn, rtes_tran, ites_tran)
+        v_pnts = np.interp(percentRns/100.0*rn, Rtes_tran, Vtes_tran)
+        i_pnts = np.interp(percentRns/100.0*rn, Rtes_tran, Ites_tran)
         p_pnts = v_pnts*i_pnts
-        if plot: pylab.plot(v_pnts*1e6, i_pnts*1e3, 'o', alpha=0.8)
+        if plot: 
+            pylab.figure()
+            pylab.plot(v_pnts*1e6, i_pnts*1e3, 'o', alpha=0.8)
+            pylab.xlabel('V [mV]'); pylab.ylabel('I [uA]')
         
         return v_pnts, i_pnts, p_pnts
 
@@ -130,9 +225,9 @@ class TESAnalyze():
         for index in range(len(v_pnt_array[:,0])):
             pylab.plot(v_pnt_array[index]*1e6, i_pnt_array[index]*1e3,'o')
             rvt_m, rvt_b = scipy.polyfit(v_pnt_array[index], i_pnt_array[index], 1)
-            ites_rvt_fit = scipy.polyval([rvt_m,rvt_b],v_pnt_array[index])
-            rvt_residuals = i_pnt_array[index]-ites_rvt_fit
-            pylab.plot(v_pnt_array[index]*1e6, ites_rvt_fit*1e3)
+            Ites_rvt_fit = scipy.polyval([rvt_m,rvt_b],v_pnt_array[index])
+            rvt_residuals = i_pnt_array[index]-Ites_rvt_fit
+            pylab.plot(v_pnt_array[index]*1e6, Ites_rvt_fit*1e3)
         pylab.title('Fits to percent Rn values')
         pylab.xlabel('VTES (mu)')
         pylab.ylabel('ITES (mA)') 
@@ -317,8 +412,8 @@ class TESAnalyze():
         return alpha_array, perRnMid, Tmid_array
     
 
-    def sigma_power(self, i, sigma_i, v, sigma_v):   # calculate error in power measurement from error in voltage and current measurement
-        return np.sqrt(np.multiply(i**2,sigma_v**2) + np.multiply(v**2,sigma_i**2))   # sigma_power^2 = (I*sigma_V)^2 + (V*sigma_I)^2
+    def sigma_power(self, i, sigma_I, v, sigma_V):   # calculate error in power measurement from error in voltage and current measurement
+        return np.sqrt(np.multiply(i**2,sigma_V**2) + np.multiply(v**2,sigma_I**2))   # sigma_power^2 = (I*sigma_V)^2 + (V*sigma_I)^2
 
     def Psat_atT(self, T, Tc, k, n):
         return k*(Tc**n-T**n)
@@ -353,3 +448,214 @@ class TESAnalyze():
         nterm = ( GTc * Tc**(n-1)*(n*np.log(Tc)+1)/(n**2) )**2 * nerr**2
         sigma_k = Gterm + Tcterm + nterm
         return k, sigma_k
+
+
+    def load_data(self, dfiles):
+
+        bays = ['BayAY', 'BayAX']
+        tesids = []
+        data = {}   # data dict
+
+        for bb in np.arange(len(bays)):
+            ### load data
+            dfile = dfiles[bb]
+            with open(dfile, "rb") as f:
+                data_temp = pkl.load(f, encoding='latin1')
+            tesids_temp = [(str(bays[bb])) + '_' + key for key in data_temp[bays[bb]]]
+            if bays[bb] == 'BayAY':
+                # remove noisy data (probably unlocked SQUID)
+                tesids_temp.remove('BayAY_Row00')   # noisy
+                tesids_temp.remove('BayAY_Row09')   # noisy
+                tesids_temp.remove('BayAY_Row15')   # noisy
+            elif bays[bb] == 'BayAX':  
+                # remove noisy data (probably unlocked SQUID)
+                tesids_temp.remove('BayAX_Row05')   
+                tesids_temp.remove('BayAX_Row11')    
+                tesids_temp.remove('BayAX_Row14')   
+                tesids_temp.remove('BayAX_Row15') 
+                pass
+            data[bays[bb]] = data_temp[bays[bb]]
+            tesids.extend(tesids_temp)
+
+        tesids = np.array(tesids)
+
+        return data, tesids
+
+    def convert_rawdata(self, data, tesids, constT=True, v_nfit=0.3, save_figs=False, show_aplots=False, tran_pRn_start=0.2, pRn=np.array([25, 30, 40, 50, 60, 70, 80]), 
+                        fn_comments='', bolotest_dir='/Users/angi/NIS/Bolotest_Analysis/'):
+        ## sort raw data and convert to real units
+        # v_nfit [V] = v_bias above which TES is normal (approximate)
+        # tran_pRn_start = Fraction of Rn dubbed beginning of SC transition
+        # Tb_ind = index in Tbaths of Tbath to quote, 2 = 168 mK?
+
+        ivs = {}   # master dictionary
+
+        for tesid in tesids:   # iterate through bolos
+
+            bay = tesid.split('_')[0]; row = tesid.split('_')[1]
+            if bay=='BayAY':
+                pad = str(int(tesid.split('Row')[1])+1)  # pad number
+            elif bay=='BayAX':
+                pad = str(int(tesid.split('Row')[1])+16)  # pad number
+            
+            tes = TESAnalyze() 
+            boloid = pad_bolo_map[pad]   # map TES ID to pad # to bolo ID
+            ivs[tesid] = {}  
+            ivs[tesid]['Pad'] = pad; ivs[tesid]['Bolometer'] = boloid; ivs[tesid]['Bay'] = bay  # save IDs to main dictionary
+            
+            iv_labels = [key for key in data[bay][row]['iv']]   # label for IV taken at some base temp
+            if tesid == 'BayAY_Row12' or tesid == 'BayAX_Row10' or tesid == 'BayAX_Row03' or tesid == 'BayAX_Row00' or tesid == 'BayAX_Row06': 
+                iv_labels.remove('iv014')   # wonky IV
+
+            maxiv = max([len(data[bay][row]['iv'][ivlab]['data'][0]) for ivlab in iv_labels])   # handle IVs of different lengths
+            asize = (len(data[bay][row]['iv']), maxiv)   # temp length by maximum iv size
+            
+            # initialize arrays
+            Vbias = np.full(asize, np.nan); Vfb = np.full(asize, np.nan)   
+            Vtes = np.full(asize, np.nan); Ites = np.full(asize, np.nan); Rtes = np.full(asize, np.nan); i_meas = np.full(asize, np.nan); Ptes = np.full(asize, np.nan)
+            Tbaths = np.full((len(iv_labels), 1), np.nan); Rns = np.full((len(Tbaths), 1), np.nan)
+            v_pnts = np.zeros((len(iv_labels), len(pRn))); i_pnts = np.zeros((len(iv_labels), len(pRn))); p_pnts = np.zeros((len(iv_labels), len(pRn)))   # interpolated IV points at each % Rn
+            sigma_V = np.full((len(iv_labels), 1), np.nan); sigma_I = np.full((len(iv_labels), 1), np.nan); nfits_real = np.zeros((len(iv_labels), 2))
+
+            for ii, ivlab in enumerate(iv_labels):   # iterate through IVs at different base temperatures
+
+                # sort raw data
+                Tbaths[ii] = data[bay][row]['iv'][ivlab]['measured_temperature']
+                ivlen = len(data[bay][row]['iv'][ivlab]['data'][0])   # handle IVs of different lengths
+                Vbias[ii,:ivlen] = data[bay][row]['iv'][ivlab]['data'][0,::-1]   # raw voltage, taken from high voltage -> 0
+                Vfb[ii,:ivlen] = data[bay][row]['iv'][ivlab]['data'][1,::-1]   # raw current, taken from high voltage -> 0
+                
+                # convert to real units
+                Vtes[ii], Ites[ii], Rtes[ii], Ptes[ii], i_meas[ii], n_fit, norm_inds, sc_fit, end_sc, rpar = tes.ivAnalyzeTDM(Vbias[ii], Vfb[ii], Rfb, Rb, Rsh, M_r, v_nfit, show_plot=False)
+                nfits_real[ii] = np.polyfit(Vtes[ii,norm_inds][0], Ites[ii,norm_inds][0], 1)   # normal branch line fit in real units
+                Ifit_norm = Vtes[ii,norm_inds]*nfits_real[ii, 0]+nfits_real[ii, 1]   # normal branch line fit in real units
+                
+                Rns[ii] = np.mean(Rtes[ii, norm_inds])   # ohms, should be consistent with 1/nfit_real[0]
+                sigma_V[ii] = np.std(Vtes[ii,:end_sc])   # V, error in voltage measurement = std of SC branch
+                sigma_I[ii] = np.std(Ites[ii,norm_inds] - Ifit_norm)  # A, error in current measurement = std in normal branch after line subtraction
+                
+                # interpolate IV points at various % Rn at this Tbath
+                v_pnts[ii], i_pnts[ii], p_pnts[ii] = tes.ivInterpolate(Vtes[ii], Ites[ii], Rtes[ii], pRn, Rns[ii], tran_pRn_start=tran_pRn_start, plot=False)    
+
+            if show_aplots: 
+                pylab.figure()
+                ivsort = np.argsort(Tbaths)   # plot IVs with increasing Tbath
+                for ii in ivsort:
+                    pylab.plot(v_pnts[ii]*1e6, i_pnts[ii]*1e3, 'o', alpha=0.7, color=pylab.cm.plasma((Tbaths[ii]-min(TbsToReturn)*1)/(max(Tbaths))))   # Tbaths/max(Tbaths)
+                    pylab.plot(Vtes[ii]*1e6, Ites[ii]*1e3, alpha=0.6, label='{} mK'.format(round(Tbaths[ii]*1E3,2)), color=pylab.cm.plasma((Tbaths[ii]-min(TbsToReturn)*1)/(max(Tbaths)*0.8)))
+                pylab.xlabel('Voltage [$\mu$V]')
+                pylab.ylabel('Current [mA]')
+                pylab.title('Interpolated IV Points')
+                pylab.legend()
+                if save_figs: pylab.savefig(bolotest_dir + 'Plots/IVs/' + tesid + '_interpIVs' + fn_comments + '.png', dpi=300)
+
+            Rn = np.nanmean(Rns); Rn_err = np.nanstd(Rns)
+            sigma_p = np.zeros(np.shape(i_pnts))   # this is stupid but it works
+            for ii in np.arange(len(i_pnts)):
+                sigma_p[ii] = tes.sigma_power(i_pnts[ii], sigma_I[ii], v_pnts[ii], sigma_V[ii])
+
+        # store results in dict
+        sort_inds = np.argsort(Tbaths)   # sort by temp, ignore nans
+        ivs[tesid]['TES ID'] = tesid  
+        ivs[tesid]['meas_temps'] = Tbaths[sort_inds]   # K
+        ivs[tesid]['constT'] = constT
+        ivs[tesid]['vbias'] = Vbias[sort_inds]  
+        ivs[tesid]['vfb'] = Vfb[sort_inds]  
+        ivs[tesid]['vtes'] = Vtes[sort_inds]   # volts
+        ivs[tesid]['ites'] = Ites[sort_inds]   # amps
+        ivs[tesid]['rtes'] = Rtes[sort_inds]   # ohms
+        ivs[tesid]['ptes'] = Ptes[sort_inds]   # power
+        ivs[tesid]['ptes_fit'] = p_pnts   # TES power at % Rns
+        ivs[tesid]['ptes_err'] = sigma_p   # error bar on TES power at % Rns
+        ivs[tesid]['i_meas'] = i_meas[sort_inds]   # amps
+        ivs[tesid]['rn_meas'] = Rn   # Ohms?
+        ivs[tesid]['rn_err'] = Rn_err   # Ohms?
+
+        return ivs
+    
+    def fit_powerlaws(self, ivs,  save_figs=False, fitGexplicit=True, pRn_toquote=80, Tinds_return=np.array([0, 3, 8, 11, 15, 2]), fn_comments='', Tb_ind=2, constT=True, 
+                      pRn=np.array([25, 30, 40, 50, 60, 70, 80]), init_guess=np.array([1.E-10, 2.5, .170]), bolotest_dir='/Users/angi/NIS/Bolotest_Analysis/'):
+        ### wrapper to fit power laws for all TESs
+        # const_T = quote constant T_TES fit values vs values at a particular T_TES
+
+        pfig_path = bolotest_dir + 'Plots/Psat_fits/' + tesid + '_Pfit' + fn_comments + '.png' if save_figs else None
+        tesids = np.array([key for key in ivs.keys()])
+
+        Tbaths = ivs[tesid]['meas_temps']
+        TbsToReturn = Tbaths[Tinds_return]   # Tbaths to show on P vs % Rn plots
+        Tb_toquote = Tbaths[Tb_ind]
+        qind = np.where(pRn==pRn_toquote)[0][0]   # save results from chosen %Rn fit
+        if not constT: tind = np.where(TbsToReturn==Tb_toquote)[0][0]  # if T_TES is allowed to vary with Tb (i.e. not assumed to be Tc), which 
+        
+        for tesid in tesids:
+            tes = TESAnalyze() 
+
+            p_pnts = ivs[tesid]['ptes_fit']; sigma_p = ivs[tesid]['ptes_err']   # TES power at % Rns from interpolated IV points
+
+            GTcs, Ks, ns, Ttes, GTcs_err, Ks_err, ns_err, Ttes_err = tes.fitPowerLaw(pRn, Tbaths, p_pnts.T, init_guess, fitToLast=True, 
+                    suptitle=tesid, TbsToReturn=TbsToReturn, plot=True, sigma=sigma_p.T, nstd=5, pfigpath=pfig_path, constT=constT, fitGexplicit=fitGexplicit)   # pass error to fitter     
+            if save_figs: pylab.savefig(bolotest_dir + 'Plots/fit_params/' + tesid + '_fitparams' + fn_comments + '.png', dpi=300) 
+            
+            if constT:
+                GTc_toquote = GTcs[qind]; GTcerr_toquote = GTcs_err[qind]
+                Tc_toquote = Ttes[qind]; Tcerr_toquote = Ttes_err[qind]
+            else:
+                GTc_toquote = GTcs[tind, qind]; GTcerr_toquote = GTcs_err[tind, qind]
+                Tc_toquote = Ttes[tind, qind]; Tcerr_toquote = Ttes_err[tind, qind]
+
+            print(' ')
+            print(' ')
+            print(tesid)
+            print('G = ', round(GTc_toquote*1e12, 2), ' +/- ', round(GTcerr_toquote*1e12, 2), 'pW/K')
+            print('K = ',  round(Ks[qind]*1E11, 3), ' +/- ',  round(Ks_err[qind]*1E11, 3), ' E-11') 
+            print('n = ', round(ns[qind], 2), ' +/- ', round(ns_err[qind], 4))
+            print('Tc = ', round(Tc_toquote*1e3, 2), ' +/- ',  round(Tcerr_toquote*1e3, 2), 'mK')
+            print('TES Rn = ', round(Rn*1e3, 2), ' +/- ', round(Rn_err*1e3, 2), ' mOhms')
+
+            ### calculate Psat
+            # find transition + normal branch
+            sc_inds = np.where((Rtes[Tb_ind]/Rn)<.2)[0]
+            start_ind = np.max(sc_inds)
+            end_ind = np.max(np.where(((Rtes[Tb_ind]/Rn)>.2) & (Rtes[Tb_ind]!=np.nan)))
+            Vtes_tran = Vtes[Tb_ind, start_ind:end_ind]
+            Ites_tran = Ites[Tb_ind, start_ind:end_ind]
+            Rtes_tran = Rtes[Tb_ind, start_ind:end_ind]
+
+            # calculate Psat
+            Ptes_tran = Vtes_tran * Ites_tran
+            sat_ind = np.where(Ites_tran == np.min(Ites_tran))[0][0]   # where the TES goes normal
+            Psat = Ptes_tran[sat_ind]
+            Psat_err = tes.sigma_power(Ites_tran[sat_ind], sigma_I[Tb_ind], Vtes_tran[sat_ind], sigma_V[Tb_ind])
+            Psat_calc = tes.Psat_atT(Tb_toquote, Tc_toquote, Ks[qind], ns[qind])
+            print('Psat = ', round(Psat*1e12, 4), ' +/- ', round(Psat_err*1e12, 4), 'pW')
+            print('Psat (calc) = ', round(Psat_calc*1e12, 4), 'pW')
+            print(' ')
+            print(' ')
+            if show_psatcalc:
+                pylab.figure()
+                pylab.plot(Vtes_tran.T*1e6, Ites_tran.T/np.max(Ites_tran), label='TES IV')
+                pylab.plot(Vtes_tran.T*1e6, Ptes_tran.T/np.max(Ptes_tran), label='Power')
+                pylab.plot(Vtes_tran[sat_ind]*1e6, Psat/np.max(Ptes_tran), 'x', label='$P_{sat}$')
+                pylab.xlabel('Voltage [$\mu$V]')
+                pylab.ylabel('Normalized Current')
+                pylab.legend()
+                pylab.title('TES IV and Calculated Power at Tbath = ' + str(round(Tb_toquote*1000, 1)) + 'mK')
+                if save_figs: pylab.savefig(bolotest_dir + 'Plots/psat_calc/' + tesid + '_psatcalc' + fn_comments + '.png', dpi=300)
+
+
+            ivs[tesid]['fitGexplicit'] = fitGexplicit
+            ivs[tesid]['G@Tc [pW/K]'] = GTc_toquote*1e12 
+            ivs[tesid]['G_err@Tc [pW/K]'] = GTcerr_toquote*1e12
+            ivs[tesid]['G@170mK [pW/K]'] = tes.scale_G(.170, GTc_toquote, Tc_toquote, ns[qind])*1e12  
+            ivs[tesid]['G_err@170mK [pW/K]'] = tes.sigma_GscaledT(.170, GTc_toquote, Tc_toquote, ns[qind], GTcerr_toquote, Tcerr_toquote, ns_err[qind])*1e12  
+            ivs[tesid]['k'] = Ks[qind] 
+            ivs[tesid]['k_err'] = Ks_err[qind] 
+            ivs[tesid]['n'] = ns[qind] 
+            ivs[tesid]['n_err'] = ns_err[qind] 
+            ivs[tesid]['Tc [mK]'] = Tc_toquote*1e3
+            ivs[tesid]['Tc_err [mK]'] = Tcerr_toquote*1e3
+            ivs[tesid]['Psat@'+str(round(Tb_toquote*1e3))+'mK [pW], IV'] =  Psat*1e12
+            ivs[tesid]['Psat_err@'+str(round(Tb_toquote*1e3))+'mK [pW], IV'] =  Psat_err*1e12
+            ivs[tesid]['Psat@'+str(round(Tb_toquote*1e3))+'mK [pW], Calc'] =  Psat_calc*1e12
+
+        return ivs

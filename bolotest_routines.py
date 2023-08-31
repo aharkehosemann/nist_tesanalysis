@@ -5,6 +5,9 @@ import matplotlib.gridspec as gridspec
 import pickle as pkl
 from collections import OrderedDict
 import pdb
+from scipy.optimize import curve_fit
+from numpy.random import normal
+
 
 kB = 1.3806503E-23   # Boltzmann constant, [J/K]
 NA = 6.022E23   # Avogadro's number, number of particles in one mole
@@ -41,26 +44,52 @@ def GtoKappa(G, A, L):   # thermal conductance, area, length
 def KappatoG(kappa, A, L):   # thermal conductance in pW/K/um, area in um^2, length in um
     return kappa*A/L
 
-def Gfromkappas(kappas, dsub, lw, ll, layer='total', fab='legacy'):   # thickness of substrate, leg width, and leg length in um
-    # predicts G from kappa measurements and bolo geometry
-    # thickness of wiring layers is independent of geometry
-    # assumes all four legs have a wiring stack
+# def Gfromkappas(kappas, dsub, lw, ll, layer='total', fab='legacy'):   # thickness of substrate, leg width, and leg length in um
+#     # predicts G from kappa measurements and bolo geometry
+#     # thickness of wiring layers is independent of geometry
+#     # assumes all four legs have a wiring stack
 
-    kappaU, kappaW, kappaI = kappas   # pW/K/um, our measured values
+#     kappaU, kappaW, kappaI = kappas   # pW/K/um, our measured values
 
-    # bolotest W thinner from process sheet
-    if fab=='legacy': dW1 = .190; dI1 = .350; dW2 = .400; dI2 = .400   # film thicknesses, um
-    elif fab=='bolotest': dW1 = .160; dI1 = .350; dW2 = .340; dI2 = .400   # film thicknesses, um
-    else: print('Invalid fab type, choose "legacy" or "bolotest."')    
+#     # bolotest W thinner from process sheet
+#     if fab=='legacy': dW1 = .190; dI1 = .350; dW2 = .400; dI2 = .400   # film thicknesses, um
+#     elif fab=='bolotest': dW1 = .160; dI1 = .350; dW2 = .340; dI2 = .400   # film thicknesses, um
+#     else: print('Invalid fab type, choose "legacy" or "bolotest."')    
     
-    w1w, w2w = wlw(lw, fab='legacy')
-    GU_pred = KappatoG(kappaU, lw*dsub, ll)   # predicted G from substrate layer
-    GW_pred = KappatoG(kappaW, w1w*dW1, ll) + KappatoG(kappaW, w2w*dW2, ll)   # predicted G from Nb layers
-    GI_pred = KappatoG(kappaI, lw*dI1, ll) + KappatoG(kappaI, lw*dI2, ll)   # predicted G from nitride layers
-    if layer=='total': return 4*(GU_pred+GW_pred+GI_pred)
-    elif layer=='wiring': return 4*(GW_pred+GI_pred)
-    elif layer=='U': return 4*(GU_pred)
-    else: print('Invalid layer type.'); return
+#     w1w, w2w = wlw(lw, fab='legacy')
+#     GU_pred = KappatoG(kappaU, lw*dsub, ll)   # predicted G from substrate layer
+#     GW_pred = KappatoG(kappaW, w1w*dW1, ll) + KappatoG(kappaW, w2w*dW2, ll)   # predicted G from Nb layers
+#     GI_pred = KappatoG(kappaI, lw*dI1, ll) + KappatoG(kappaI, lw*dI2, ll)   # predicted G from nitride layers
+#     if layer=='total': return 4*(GU_pred+GW_pred+GI_pred)
+#     elif layer=='wiring': return 4*(GW_pred+GI_pred)
+#     elif layer=='U': return 4*(GU_pred)
+#     else: print('Invalid layer type.'); return
+
+
+### Thermal Fluctuation Noise Equivalent Power
+def FLink(Tb, Tc):   
+    # convert equilibrium NEP to nonequilibrium conditions of TES operation
+    # Mather 1982
+    # assumes k(T)~T^beta, and beta=3 (true for superconductors and crystalline dielectrics)
+    Tgrad = Tb/Tc
+    return 4/5 * (1-Tgrad**5)/(1-Tgrad**4)
+
+def TFNEP(Tc, G, Tb=0.100):   # calculate thermal fluctuation noise equivalent power as a function of G and T_TES
+    return np.sqrt(4*kB*G*FLink(Tb, Tc))*Tc 
+
+def sigma_NEP(Tc, G, sigma_G, Tb=0.100):   # error on NEP estimation
+    sigma_nepsq = kB*FLink(Tb, Tc)/G * Tc**2 * sigma_G**2
+    return np.sqrt(sigma_nepsq)
+
+def sigmaNEP_sq(Tc, G, sigma_G, Tb=0.100):   # error on NEP^2 = error on S = sqrt(4 kB FL) * T * sigma_G
+    # sigma_nep = np.sqrt(kB/G*T**2 * sigma_G**2)
+    # return 2*sigma_nep*np.sqrt(4*kB*G*T**2)
+    return 4*kB*FLink(Tb, Tc) * Tc**2 * sigma_G
+
+def GandPsatfromNEP(NEP, Tc, Tb, gamma=1):   # calculate G(Tc) and Psat(Tc) given thermal fluctuation NEP, Tc in K, and Tbath in K
+    G_Tc = (NEP/Tc)**2 / (4*kB*gamma)   # W/K
+    P_Tc = G_Tc*(Tc-Tb)   # W
+    return np.array([G_Tc, P_Tc])
 
 ### G from alpha model
 def wlw(lw, fab='bolotest', layer='wiring'):
@@ -95,7 +124,7 @@ def G_layer(fit, d, layer='U'):
     # fit = [fit parameters, fit errors (if calc_sigma=True)], thickness d is in um
     # RETURNS prediction (and error if 'fit' is 2D)
 
-    # numdevs = 1 if np.isscalar(d) else len(d)   # number of devices
+    numdevs = 1 if np.isscalar(d) else len(d)   # number of devices
     # d = np.array([d]) if np.isscalar(d) else np.array(d)   # handle thickness scalars and arrays
     d = d if np.isscalar(d) else np.array(d)   # handle thickness scalars and arrays
 
@@ -103,40 +132,32 @@ def G_layer(fit, d, layer='U'):
     elif layer=='W': linds=np.array([1,4]); d0=.400   # Nb layer parameter indexes and default thickness in um
     elif layer=='I': linds=np.array([2,5]); d0=.400   # insulating layer parameter indexes and default thickness in um
 
+    # pdb.set_trace()
     # if np.isscalar(d):
     if len(fit.shape)==2:   # user passed fit parameters and errors
         G0, alpha = fit[0][linds]; sig_G0, sig_alpha = fit[1][linds]   # parameters for layer x
         Glayer = G0 * (d/d0)**(alpha+1) 
         sig_Glayer = sig_G0**2 * (((d/d0)**(alpha+1)))**2 + (G0*(alpha+1)*d**alpha)**2 * sig_alpha**2
-        # return np.array([Glayer, sig_Glayer]).reshape((2, numdevs))
-        return np.array([Glayer, sig_Glayer])
+        # pdb.set_trace()
+        if numdevs==1:
+            return np.array([Glayer, sig_Glayer]).reshape(1, 2)
+        else:
+            return np.array([Glayer, sig_Glayer]).reshape((numdevs, 2))
+        # return np.array([Glayer, sig_Glayer])
     elif len(fit.shape)==1:   # user passed only fit parameters 
         G0, alpha = fit[linds]
         Glayer = G0 * (d/d0)**(alpha+1) 
-        # return np.array([Glayer]).reshape((1, numdevs))
+        # return np.array(Glayer).reshape((1, numdevs))
         return Glayer
     else: 
         print('Fit array has too many dimensions, either pass 1D array of parameters or 2D array of parameters and param errors.')
         return
-
-# def Gbolos(params):   
-#     GU, GW, GI, aU, aW, aI = params
-#     wstack_width = (5*0.100+3*0.285)/(0.100+0.285)   # um, effective width of W1 W2 stack on bolo 20
     
-#     bolo1b = 4*GU + GW*(4*(160/400)**(1 + aW) + 4*(340/400)**(1 + aW)*3/5) + GI*(4*(350/400)**(1 + aI) + 4)
-#     bolo24 = GU*(1 + 3*((220+120)/420)**(1 + aU)) + GW*((160/400)**(1 + aW) + (340/400)**(1 + aW)*3/5) + GI*((350/400)**(1 + aI) + 1)
-#     bolo23 = GU*(2 + 2*((220+120)/420)**(1 + aU)) + GW*(2*(160/400)**(1 + aW) + 2*(340/400)**(1 + aW)*3/5) + GI*(2*(350/400)**(1 + aI) + 2)
-#     bolo22 = GU*(3 + ((220+120)/420)**(1 + aU)) + GW*(3*(160/400)**(1 + aW) + 3*(340/400)**(1 + aW)*3/5) + GI*(3*(350/400)**(1 + aI) + 3)
-#     bolo21 = GU*(1 + 3*((280+120)/420)**(1 + aU)) + GW*((160/400)**(1 + aW) + (285/400)**(1 + aW)*3/5) + GI*(3*(670/400)**(1 + aI) + (350/400)**(1 + aI))  
-#     bolo20 = 4*GU + GW*((160/400)**(1 + aW) + 3*(385/400)**(1 + aW)*(wstack_width/5) + (285/400)**(1 + aW)*3/5) + GI*(350/400)**(1 + aI)
-#     bolo7 = GU*(3 + ((280+120)/420)**(1 + aU)) + GW*(3*(160/400)**(1 + aW) + 3*(340/400)**(1 + aW)*3/5) + GI*(3*(350/400)**(1 + aI) + (670/400)**(1 + aI) + 3) 
-#     bolo13 = GU*(1 + 3*((220+120)/420)**(1 + aU)) + GW*((160/400)**(1 + aW) + (285/400)**(1 + aW)*3/5) + GI*(350/400)**(1 + aI)
-    
-#     return np.array([bolo1b, bolo24, bolo23, bolo22, bolo21, bolo20, bolo7, bolo13])
 
-def Gbolotest(fit, layer='total'):
+def Gbolotest(fit, layer='total', layer_ds=[]):
     # returns G_TES for bolotest data set given fit parameters
     # assumes bolotest geometry
+    # derr = error on thickness as a fraction of thickness
     # can return full substrate + microstrip, just substrate, just microstrip, or an individual W / I layer
 
     wstack_width = (5*0.100+3*0.285)/(0.100+0.285)   # um, effective width of W1 W2 stack on bolo 20
@@ -155,27 +176,80 @@ def Gbolotest(fit, layer='total'):
     else:
         print('Unknown layer'+layer+'. Options include "total", "wiring", "U", "W", and "I".')
 
-    G_legA = G_layer(fit, 0.420, layer='U')*include_U + G_layer(fit, 0.160, layer='W')*include_W + G_layer(fit, 0.350, layer='I')*include_I + G_layer(fit, 0.340, layer='W')*3/5*include_W + G_layer(fit, 0.400, layer='I')*include_I # S-W1-I1-W2-I2
-    G_legB = G_layer(fit, 0.420, layer='U')*include_U + G_layer(fit, 0.160, layer='W')*include_W + G_layer(fit, 0.350, layer='I')*include_I + G_layer(fit, 0.285, layer='W')*3/5*include_W   # S-W1-I1-W2
-    G_legC = G_layer(fit, 0.400, layer='U')*include_U + G_layer(fit, 0.350, layer='I') + G_layer(fit, 0.340, layer='W')*3/5*include_W + G_layer(fit, 0.400, layer='I')*include_I   # S-I1-W2-I2
-    G_legD = G_layer(fit, 0.420, layer='U')*include_U + G_layer(fit, 0.160, layer='W')*include_W + G_layer(fit, 0.270 + 0.400, layer='I')*include_I   # S-W1-I1-I2 (I stack)
-    G_legE = G_layer(fit, 0.420, layer='U')*include_U + G_layer(fit, 0.100 + 0.285, layer='W')*wstack_width/5*include_W   # S-W1-W2 (W stack)
-    G_legF = G_layer(fit, 0.400, layer='U')*include_U + G_layer(fit, 0.400 + 0.270, layer='I')*include_I   # S-I1-I2 (I stack)
-    G_legG = G_layer(fit, 0.340, layer='U')*include_U   # bare S 
+    if len(layer_ds)>0:   # pull thicknesses from a normal distribution 
+        # fracerr = 0.00   # error on thickness estimates
+        # layers that see the same processing steps share the same value
 
-    G_1b = 4*G_legA
-    G_24 = 1*G_legA + 3*G_legG
-    G_23 = 2*G_legA + 2*G_legG
-    G_22 = 3*G_legA + 1*G_legG
-    G_21 = 1*G_legB + 3*G_legF
-    G_20 = 1*G_legB + 3*G_legE
-    G_7 = 2*G_legA + 1*G_legC + 1*G_legD
-    G_13 = 1*G_legB + 3*G_legG
+        # film thicknesses as a function of processing steps
+        # dS_A = normal(0.420, derr*0.420); dS_C = normal(0.400, derr*0.400); dS_G = normal(0.340, derr*0.340)   # thickness of S for leg A, C, and G [um]
+        # dW1_A = normal(0.160, derr*0.160); dW1_E = normal(0.100, derr*0.100)   # thickness of W1 for legs A and E [um]  
+        # dI1_A = normal(0.350, derr*0.350); dI1_D = normal(0.270, derr*0.270)   # thickness of I1 for legs A and G [um]  
+        # dW2_A = normal(0.340, derr*0.340); dW2_B = normal(0.285, derr*0.285)   # thickness of W2 for legs A and B [um]  
+        # dI2_A = normal(0.400, derr*0.400)   # thickness of I1 for legs A and G [um]  
+        dS_A, dS_C, dS_G, dW1_A, dW1_E, dI1_A, dI1_D, dW2_A, dW2_B, dI2_A = layer_ds
+
+        # G_legA = G_layer(fit, dS_A, layer='U')*include_U + G_layer(fit, dW1_A, layer='W')*include_W + G_layer(fit, dI1_A, layer='I')*include_I + G_layer(fit, dW2_A, layer='W')*3/5*include_W + G_layer(fit, dI2_A, layer='I')*include_I # S-W1-I1-W2-I2
+        # G_legB = G_layer(fit, dS_A, layer='U')*include_U + G_layer(fit, dW1_A, layer='W')*include_W + G_layer(fit, dI1_A, layer='I')*include_I + G_layer(fit, dW2_B, layer='W')*3/5*include_W   # S-W1-I1-W2
+        # G_legC = G_layer(fit, dS_C, layer='U')*include_U + G_layer(fit, dI1_A, layer='I') + G_layer(fit, dW2_A, layer='W')*3/5*include_W + G_layer(fit, dI2_A, layer='I')*include_I   # S-I1-W2-I2
+        # G_legD = G_layer(fit, dS_A, layer='U')*include_U + G_layer(fit, dW1_A, layer='W')*include_W + G_layer(fit, dI1_D + dI2_A, layer='I')*include_I   # S-W1-I1-I2 (I stack)
+        # G_legE = G_layer(fit, dS_A, layer='U')*include_U + G_layer(fit, dW1_E + dW2_B, layer='W')*wstack_width/5*include_W   # S-W1-W2 (W stack)
+        # G_legF = G_layer(fit, dS_C, layer='U')*include_U + G_layer(fit, dI2_A + dI1_D, layer='I')*include_I   # S-I1-I2 (I stack)
+        # G_legG = G_layer(fit, dS_G, layer='U')*include_U   # bare S 
+
+        # G_legA = G_layer(fit, normal(0.420, derr*0.420), layer='U')*include_U + G_layer(fit, normal(0.160, derr*0.160), layer='W')*include_W + G_layer(fit, normal(0.350, derr*0.350), layer='I')*include_I + G_layer(fit, normal(0.340, derr*0.340), layer='W')*3/5*include_W + G_layer(fit, normal(0.400, derr*0.400), layer='I')*include_I # S-W1-I1-W2-I2
+        # G_legB = G_layer(fit, normal(0.420, derr*0.420), layer='U')*include_U + G_layer(fit, normal(0.160, derr*0.160), layer='W')*include_W + G_layer(fit,normal(0.350, derr*0.350), layer='I')*include_I + G_layer(fit, normal(0.285, derr*0.285), layer='W')*3/5*include_W   # S-W1-I1-W2
+        # G_legC = G_layer(fit, normal(0.400, derr*0.400), layer='U')*include_U + G_layer(fit, normal(0.350, derr*0.350), layer='I') + G_layer(fit, normal(0.340, derr*0.340), layer='W')*3/5*include_W + G_layer(fit, normal(0.400, derr*0.400), layer='I')*include_I   # S-I1-W2-I2
+        # G_legD = G_layer(fit, normal(0.420, derr*0.420), layer='U')*include_U + G_layer(fit, normal(0.160, derr*0.160), layer='W')*include_W + G_layer(fit, normal(0.270, derr*0.270) + normal(0.400, derr*0.400), layer='I')*include_I   # S-W1-I1-I2 (I stack)
+        # G_legE = G_layer(fit, normal(0.420, derr*0.420), layer='U')*include_U + G_layer(fit, normal(0.100, derr*0.100) + normal(0.285, derr*0.285), layer='W')*wstack_width/5*include_W   # S-W1-W2 (W stack)
+        # G_legF = G_layer(fit, normal(0.400, derr*0.400), layer='U')*include_U + G_layer(fit, normal(0.400, derr*0.400) + normal(0.270, derr*0.270), layer='I')*include_I   # S-I1-I2 (I stack)
+        # G_legG = G_layer(fit, normal(0.340, derr*0.340), layer='U')*include_U   # bare S 
+    else:
+
+        dS_A = 0.420; dS_C = 0.400; dS_G =0.340   # thickness of S for leg A, C, and G [um]
+        dW1_A = 0.160; dW1_E = 0.100   # thickness of W1 for legs A and E [um]  
+        # dI1_A = 0.350; dI1_D = 0.270   # thickness of I1 for legs A and G [um]  
+        dI1_A = 0.350; dI1_D = 0.350   # thickness of I1 for legs A and G [um]  
+        dW2_A = 0.340; dW2_B =0.285   # thickness of W2 for legs A and B [um]  
+        dI2_A = 0.400   # thickness of I1 for legs A and G [um]  
+
+        # G_legA = G_layer(fit, 0.420, layer='U')*include_U + G_layer(fit, 0.160, layer='W')*include_W + G_layer(fit, 0.350, layer='I')*include_I + G_layer(fit, 0.340, layer='W')*3/5*include_W + G_layer(fit, 0.400, layer='I')*include_I # S-W1-I1-W2-I2
+        # G_legB = G_layer(fit, 0.420, layer='U')*include_U + G_layer(fit, 0.160, layer='W')*include_W + G_layer(fit, 0.350, layer='I')*include_I + G_layer(fit, 0.285, layer='W')*3/5*include_W   # S-W1-I1-W2
+        # G_legC = G_layer(fit, 0.400, layer='U')*include_U + G_layer(fit, 0.350, layer='I') + G_layer(fit, 0.340, layer='W')*3/5*include_W + G_layer(fit, 0.400, layer='I')*include_I   # S-I1-W2-I2
+        # G_legD = G_layer(fit, 0.420, layer='U')*include_U + G_layer(fit, 0.160, layer='W')*include_W + G_layer(fit, 0.270 + 0.400, layer='I')*include_I   # S-W1-I1-I2 (I stack)
+        # G_legE = G_layer(fit, 0.420, layer='U')*include_U + G_layer(fit, 0.100 + 0.285, layer='W')*wstack_width/5*include_W   # S-W1-W2 (W stack)
+        # G_legF = G_layer(fit, 0.400, layer='U')*include_U + G_layer(fit, 0.400 + 0.270, layer='I')*include_I   # S-I1-I2 (I stack)
+        # G_legG = G_layer(fit, 0.340, layer='U')*include_U   # bare S 
+    
+    G_legA = G_layer(fit, dS_A, layer='U')*include_U + G_layer(fit, dW1_A, layer='W')*include_W + G_layer(fit, dI1_A, layer='I')*include_I + G_layer(fit, dW2_A, layer='W')*3/5*include_W + G_layer(fit, dI2_A, layer='I')*include_I # S-W1-I1-W2-I2
+    G_legB = G_layer(fit, dS_A, layer='U')*include_U + G_layer(fit, dW1_A, layer='W')*include_W + G_layer(fit, dI1_A, layer='I')*include_I + G_layer(fit, dW2_B, layer='W')*3/5*include_W   # S-W1-I1-W2
+    G_legC = G_layer(fit, dS_C, layer='U')*include_U + G_layer(fit, dI1_A, layer='I') + G_layer(fit, dW2_A, layer='W')*3/5*include_W + G_layer(fit, dI2_A, layer='I')*include_I   # S-I1-W2-I2
+    G_legD = G_layer(fit, dS_A, layer='U')*include_U + G_layer(fit, dW1_A, layer='W')*include_W + G_layer(fit, dI1_D + dI2_A, layer='I')*include_I   # S-W1-I1-I2 (I stack)
+    G_legE = G_layer(fit, dS_A, layer='U')*include_U + G_layer(fit, dW1_E + dW2_B, layer='W')*wstack_width/5*include_W   # S-W1-W2 (W stack)
+    G_legF = G_layer(fit, dS_C, layer='U')*include_U + G_layer(fit, dI1_D + dI2_A, layer='I')*include_I   # S-I1-I2 (I stack)
+    G_legG = G_layer(fit, dS_G, layer='U')*include_U   # bare S 
 
     if len(fit.shape)==2:   # return values and errors
+        G_1b = 4*G_legA[0]
+        G_24 = 1*G_legA[0] + 3*G_legG[0]
+        G_23 = 2*G_legA[0] + 2*G_legG[0]
+        G_22 = 3*G_legA[0] + 1*G_legG[0]
+        G_21 = 1*G_legB[0] + 3*G_legF[0]
+        G_20 = 1*G_legB[0] + 3*G_legE[0]
+        G_7 = 2*G_legA[0] + 1*G_legC[0] + 1*G_legD[0]
+        G_13 = 1*G_legB[0] + 3*G_legG[0]
+        # pdb.set_trace()
         Gbolos = np.array([G_1b[0], G_24[0], G_23[0], G_22[0], G_21[0], G_20[0], G_7[0], G_13[0]]); sigma_Gbolos = np.array([G_1b[1], G_24[1], G_23[1], G_22[1], G_21[1], G_20[1], G_7[1], G_13[1]])
         return Gbolos, sigma_Gbolos
-    else:
+    else:   # return values
+        G_1b = 4*G_legA
+        G_24 = 1*G_legA + 3*G_legG
+        G_23 = 2*G_legA + 2*G_legG
+        G_22 = 3*G_legA + 1*G_legG
+        G_21 = 1*G_legB + 3*G_legF
+        G_20 = 1*G_legB + 3*G_legE
+        G_7 = 2*G_legA + 1*G_legC + 1*G_legD
+        G_13 = 1*G_legB + 3*G_legG
+
         return np.array([G_1b, G_24, G_23, G_22, G_21, G_20, G_7, G_13])   # return values
     
 
@@ -197,14 +271,22 @@ def Gbolos_six(params):
     return np.array([bolo1b, bolo24, bolo23, bolo22, bolo21, bolo20, bolo7, bolo13])
 
 ### fitting free parameters of model
-def chisq_val(params, data, model='default'):   # calculates chi-squared value
-    ydata, sigma = data
+def chisq_val(params, args, model='default', layer_ds=[]):   # calculates chi-squared value
+
+    # if len(args)==4:
+    #     ydata, sigma, vary_thickness, layer_ds = args
+    if len(args)==3:
+        ydata, sigma, layer_ds = args
+    elif len(args)==2:
+        ydata, sigma = args
+
     if model=='default':
-        Gbolos_model = Gbolotest(params)   # predicted G of each bolo
+        Gbolos_model = Gbolotest(params, layer_ds=layer_ds)   # predicted G of each bolo
     elif model=='six_layers':   # model SiOx as it's own layer
         Gbolos_model = Gbolos_six(params)
     chisq_vals = (Gbolos_model-ydata)**2/sigma**2
 
+    # pdb.set_trace()
     return np.sum(chisq_vals)
 
 def calc_func_grid(params, data):   # chi-squared parameter space
@@ -215,25 +297,40 @@ def calc_func_grid(params, data):   # chi-squared parameter space
             func_grid[rr, cc] = chisq_val(params_rc, data)
     return func_grid
 
-def runsim_chisq(num_its, p0, data, bounds, plot_dir, show_yplots=False, save_figs=False, fn_comments='', save_sim=False, sim_file=None, model='default'):  
+def runsim_chisq(num_its, p0, data, bounds, plot_dir, show_yplots=False, save_figs=False, fn_comments='', save_sim=False, sim_file=None, model='default', vary_thickness=False, derr=0.0):  
     # returns G and alpha fit parameters
     # returned G's have units of ydata (most likely pW/K)
 
     print('\n'); print('Running Minimization MC Simulation'); print('\n')
     ydata, sigma = data
-
     pfits_sim = np.empty((num_its, len(p0)))
     y_its = np.empty((num_its, len(ydata)))
     Gwires = np.empty((num_its, 1))
-    for ii in np.arange(num_its):   # run simulation
-        y_its[ii] = np.random.normal(ydata, sigma)   # pull G's from normal distribution characterized by fit error
-        it_result = minimize(chisq_val, p0, args=[y_its[ii], sigma], bounds=bounds)
-        pfits_sim[ii] = it_result['x']
-        Gwires[ii] = Gfrommodel(pfits_sim[ii], 0.420, 7, 220, layer='wiring', fab='bolotest')[0,0]/4   # function outputs G for four legs worth of microstrip
+    layer_ds = np.empty((num_its, 10))
 
+    for ii in np.arange(num_its):   # run simulation
+
+        y_its[ii] = np.random.normal(ydata, sigma)   # pull G's from normal distribution characterized by fit error
+
+        if vary_thickness:   # pull thicknesses from normal distribution, assuming error is some % of d
+            dS_A = normal(0.420, derr*0.420); dS_C = normal(0.400, derr*0.400); dS_G = normal(0.340, derr*0.340)   # thickness of S for leg A, C, and G [um]
+            dW1_A = normal(0.160, derr*0.160); dW1_E = normal(0.100, derr*0.100)   # thickness of W1 for legs A and E [um]  
+            dI1_A = normal(0.350, derr*0.350); dI1_D = normal(0.270, derr*0.270)   # thickness of I1 for legs A and G [um]  
+            dW2_A = normal(0.340, derr*0.340); dW2_B = normal(0.285, derr*0.285)   # thickness of W2 for legs A and B [um]  
+            dI2_A = normal(0.400, derr*0.400)   # thickness of I1 for legs A and G [um]  
+            layer_ds[ii] = dS_A, dS_C, dS_G, dW1_A, dW1_E, dI1_A, dI1_D, dW2_A, dW2_B, dI2_A
+        else:
+            layer_ds[ii] =  np.empty(10)
+
+        # pdb.set_trace()
+        it_result = minimize(chisq_val, p0, args=[y_its[ii], sigma, layer_ds[ii]], bounds=bounds)   # minimize chi-squared function with this iteration's G_TES values and film thicknesses
+        pfits_sim[ii] = it_result['x']
+        # pdb.set_trace()
+        Gwires[ii] = Gfrommodel(pfits_sim[ii], 0.420, 7, 220, layer='wiring', fab='bolotest', layer_ds=layer_ds)/4   # function outputs G for four legs worth of microstrip
+        # Gfrommodel(fit, dsub, lw, ll, layer='wiring')
     if show_yplots:
         for yy, yit in enumerate(y_its.T):   # check simulated ydata is a normal dist'n
-            plt.figure()
+            # plt.figure()
             n, bins, patches = plt.hist(yit, bins=20, label='Simulated Data')
             plt.axvline(ydata[yy], color='k', linestyle='dashed', label='Measured Value')
             plt.legend()
@@ -279,27 +376,34 @@ def runsim_chisq(num_its, p0, data, bounds, plot_dir, show_yplots=False, save_fi
 
 
 ### visualize and evaluate quality of fit
-def qualityplots(data, sim_dict, plot_dir='./', save_figs=False, fn_comments='', vmax=500, figsize=(17,5.75), title='', print_results=True, calc='mean', spinds=[], plot=True):
+def qualityplots(data, sim_dict, plot_dir='./', save_figs=False, fn_comments='', vmax=2E3, figsize=(17,5.75), title='', print_results=True, calc='mean', spinds=[], plot=True, qplim=[0,2]):
     ### plot chisq values in 2D parameter space (alpha_x vs G_x) overlayed with resulting parameters from simulation for all three layers
     # params can be either the mean or median of the simulation values
     # spinds are indexes of a certain subpopulation to plot. if the length of this is 0, it will analyze the entire population. 
+    # pdb.set_trace()
 
     layers = np.array(['U', 'W', 'I'])
-    simdata_temp = sim_dict['sim']
-    if len(spinds)==0: spinds = np.arange(np.shape(simdata_temp)[1])   # allow for analyzing only subsections of simulation data 
-    sim_data = simdata_temp[spinds]
-    Gwires = sim_dict['Gwires'][spinds]
+    if type(sim_dict)==dict:
 
-    # calculate the fit params as either the mean or median of the simulation values
-    if calc == 'mean':
-        fit_params, fit_errs = [np.mean(sim_data, axis=0), np.std(sim_data, axis=0)]   # take mean values
-        Gwire = np.mean(Gwires); sigma_Gwire = np.std(Gwires)
-    if calc == 'median':
-        fit_params, fit_errs = [np.median(sim_data, axis=0), np.std(sim_data, axis=0)]   # take median values to avoid outliers
-        Gwire = np.median(Gwires); sigma_Gwire = np.std(Gwires)
+        sim_dataT = sim_dict['sim']; simdata_temp = sim_dataT.T 
+        if len(spinds)==0: spinds = np.arange(np.shape(simdata_temp)[1])
+        sim_data = simdata_temp[:,spinds]
+        Gwires = sim_dict['Gwires'][spinds]
+
+        # calculate the fit params as either the mean or median of the simulation values
+        if calc == 'mean':
+            fit_params, fit_errs = [np.mean(sim_data, axis=1), np.std(sim_data, axis=1)]   # take mean values
+            Gwire = np.mean(Gwires); sigma_Gwire = np.std(Gwires)
+        if calc == 'median':
+            fit_params, fit_errs = [np.median(sim_data, axis=1), np.std(sim_data, axis=1)]   # take median values to avoid outliers
+            Gwire = np.median(Gwires); sigma_Gwire = np.std(Gwires)
+    else:   # option to pass just fit parameters
+        fit_params = sim_dict
+        fit_errs = np.array([0,0,0,0,0,0])
+        Gwire = Gfrommodel(fit_params, 0.420, 7, 220, layer='wiring', fab='bolotest')/4; sigma_Gwire=0
 
     if plot:
-        xgridlim=[0,2]; ygridlim=[0,2]   # alpha_layer vs G_layer 
+        xgridlim=qplim; ygridlim=qplim   # alpha_layer vs G_layer 
         xgrid, ygrid = np.mgrid[xgridlim[0]:xgridlim[1]:150j, ygridlim[0]:ygridlim[1]:150j]   # make 2D grid for plotter
         wspace = 0.25
 
@@ -324,7 +428,7 @@ def qualityplots(data, sim_dict, plot_dir='./', save_figs=False, fn_comments='',
 
             funcgrid = calc_func_grid(gridparams, data)   # calculate chisq values for points in the grid
             ax = fig.add_subplot(1,3,ll+1)   # select subplot
-            im = plt.imshow(funcgrid, cmap=plt.cm.RdBu, vmin=100, vmax=vmax, extent=[min(xgridlim), max(xgridlim), min(ygridlim), max(ygridlim)], origin='lower', alpha=0.6)   # quality plot
+            im = plt.imshow(funcgrid, cmap=plt.cm.RdBu, vmax=vmax, extent=[min(xgridlim), max(xgridlim), min(ygridlim), max(ygridlim)], origin='lower', alpha=0.6)   # quality plot
             plt.errorbar(fit_params[Gind], fit_params[aind], xerr=fit_errs[Gind], yerr=fit_errs[aind], color='black', label='\\textbf{Model Fit}', capsize=2, linestyle='None')   # fit results
             plt.xlabel(xlab); plt.ylabel(ylab)
             plt.xlim(xgridlim[0], xgridlim[1]); plt.ylim(ygridlim[0], ygridlim[1])
@@ -414,10 +518,11 @@ def pairwise(sim_data, labels, title='', plot_dir='./', fn_comments='', save_fig
 
     return pairfig
 
-def plot_modelvdata(fit, data, title=''):
+def plot_modelvdata(fit, data, title='', vlength_data=np.array([]), plot_bolotest=True, Lscale=1.0):
     # plot bolotest data vs model fit
     # fit = [params, sigma_params]
     # data = [Gbolos, sigma_Gbolos]
+    # plot_bolotest gives the option of turning off bolos 24-20 etc with various film stacks
 
     # bolotest geometry
     L = 220   # bolotest leg length, um
@@ -425,25 +530,73 @@ def plot_modelvdata(fit, data, title=''):
     A_bolo = np.array([(7*4*.420+5*4*.160+3*4*.340+7*4*.350+7*4*.400), (7*1*.420+7*3*.340+5*.160+3*.340+7*.350+7*.400), (7*2*.420+7*2*.340+5*2*.160+3*2*.340+7*2*.350+7*2*.400), (7*3*.420+7*1*.340+5*3*.160+3*3*.340+7*3*.350+7*3*.400), (7*1*.420+7*3*.400+5*1*.160+3*1*.285+7*3*.370+7*1*.350), (7*4*.420+5*1*.160+wstack_width*3*.385+3*1*.285+7*1*.340), (7*3*.420+7*1*.400+5*3*.160+3*1*3.340+7*3*.350+7*1*.670+7*3*.400), (7*1*.420+7*3*.400+5*1*.160+3*1*.285+7*1*.350) ])   # bolotest areas
     AoL_bolo = A_bolo/L   # A/L for bolotest devices
 
+    # pdb.set_trace()
     # predictions from model
     Gpred, sigmaGpred = Gbolotest(fit)   # predictions and error from model [pW/K]
     Gpred_wire, sigmaGpred_wire = Gbolotest(fit, layer='wiring')   # predictions and error from model [pW/K]
     Gpred_U, sigmaGpred_U = Gbolotest(fit, layer='U')   # predictions and error from model [pW/K]
+    # normres = (data[0] - Gpred)/data[0]   # normalized residuals [frac of data]
+    # resylim = -6 if 'a01' in plot_comments else -2   # different lower limits on residuals depending on model
+
+    if len(vlength_data)>0:   # show predictions for bolos1a-f; they share the same geometry as bolo 1b, leg length is varied
+        ydatavl_all, sigmavl_all, llvl_all = vlength_data   # send leg lengths in um
+        ll_vl = np.array(llvl_all[0:6])  # um
+        AoL_vL = A_bolo[0]/ll_vl   # um, all share the area of bolo 1b
+
+        dsub = 0.420; lw = 7   # um
+        Gpred_vl, sigmaGpred_vl = Gfrommodel(fit, dsub, lw, ll_vl, layer='total', fab='bolotest', Lscale=Lscale)
+        Gpredwire_vl, sigmaGpredwire_vl = Gfrommodel(fit, dsub, lw, ll_vl, layer='wiring', fab='bolotest', Lscale=Lscale)
+        GpredU_vl, sigmaGpredU_vl = Gfrommodel(fit, dsub, lw, ll_vl, layer='U', fab='bolotest', Lscale=Lscale)
 
     plt.figure()
-    plt.errorbar(AoL_bolo, data[0], yerr=data[1], marker='o', markersize=5, color='g', capsize=2, linestyle='None')
-    plt.errorbar(AoL_bolo, Gpred, yerr=sigmaGpred, color='k', marker='*', label=r"G$_\text{TES}$", capsize=2, linestyle='None')
-    plt.errorbar(AoL_bolo, Gpred_wire, yerr=sigmaGpred_wire, color='mediumpurple', marker='x', label=r"G$_\text{micro}$", linestyle='None')
-    plt.errorbar(AoL_bolo, Gpred_U, yerr=sigmaGpred_U, markersize=5, color='blue', marker='+', label=r"G$_\text{sub}$", linestyle='None')
+    gs = gridspec.GridSpec(2, 1, height_ratios=[4,1])
+    ax1 = plt.subplot(gs[0])   # model vs data
+    if plot_bolotest:
+        plt.errorbar(AoL_bolo, data[0], yerr=data[1], marker='o', markersize=5, color='g', capsize=2, linestyle='None')
+        # plt.errorbar(AoL_bolo, Gpred_wire.flatten(), yerr=sigmaGpred_wire.flatten(), color='mediumpurple', marker='x', label=r"G$_\text{micro}$", linestyle='None')
+        # plt.errorbar(AoL_bolo, Gpred_U.flatten(), yerr=sigmaGpred_U.flatten(), markersize=5, color='blue', marker='+', label=r"G$_\text{sub}$", linestyle='None')
+        plt.plot(AoL_bolo, Gpred_wire.flatten(), color='mediumpurple', marker='x', label=r"G$_\text{micro}$", linestyle='None')
+        plt.plot(AoL_bolo, Gpred_U.flatten(), markersize=5, color='blue', marker='+', label=r"G$_\text{sub}$", linestyle='None')
+        plt.errorbar(AoL_bolo, Gpred.flatten(), yerr=sigmaGpred.flatten(), color='k', marker='*', label=r"G$_\text{TES}$", capsize=2, linestyle='None')
+        for bb, boloid in enumerate(bolos):
+            plt.annotate(boloid.split(' ')[1], (AoL_bolo[bb]+0.001, data[0][bb]+0.4))
+        normres = (data[0] - Gpred)/data[0]
+        norm_ressigma = sigmaGpred/data[0]
+        plt.legend()
+        
+    if len(vlength_data)>0:
+        # plt.errorbar(A_bolo[0]/llvl_all, ydatavl_all, yerr=sigmavl_all, marker='o', markersize=5, color='g', capsize=2, linestyle='None', label='Bolos 1a-f')
+        plt.errorbar(A_bolo[0]/llvl_all, ydatavl_all, yerr=sigmavl_all, marker='o', markersize=5, color='g', capsize=2, linestyle='None')
+        # plt.errorbar(AoL_vL, Gpredwire_vl.flatten(), yerr=sigmaGpredwire_vl.flatten(), color='mediumpurple', marker='x', linestyle='None')
+        # plt.errorbar(AoL_vL, GpredU_vl.flatten(), yerr=sigmaGpredU_vl.flatten(), markersize=5, color='blue', marker='+', linestyle='None')
+        plt.plot(AoL_vL, Gpredwire_vl.flatten(), color='mediumpurple', marker='x', linestyle='None')
+        plt.plot(AoL_vL, GpredU_vl.flatten(), markersize=5, color='blue', marker='+', linestyle='None')
+        plt.errorbar(AoL_vL, Gpred_vl.flatten(), yerr=sigmaGpred_vl.flatten(), color='k', marker='*', capsize=2, linestyle='None')
     plt.ylabel('G(170mK) [pW/K]')
     plt.title(title)
-    plt.legend()
+    # plt.xlabel('Leg A/L [$\mu$m]')
+    plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)   # turn x ticks off
+    # plt.ylim(0.70, 18.4)
+
+    # pdb.set_trace()
+
+    ax2 = plt.subplot(gs[1], sharex=ax1)   # residuals
+    plt.axhline(0, color='k', alpha=0.7)
+    plt.scatter(AoL_bolo, normres, color='g', s=40, alpha=0.8)
+    # plt.errorbar(AoL_bolo, np.zeros_like(AoL_bolo), yerr=norm_ressigma, color='k', capsize=2, alpha=0.8)
+    # if len(data1b)==2: plt.scatter(data1b[0], (data1b[1]-Gpred1b_wire[0]-Gpred1b_U[0])/data1b[1]*100, color='purple')
+    plt.ylabel("\\textbf{Norm. Res.}")
     plt.xlabel('Leg A/L [$\mu$m]')
-    plt.ylim(0.70, 18.4)
+    plt.ylim(-0.1, 0.1)
+    plt.tick_params(axis="y", which="both", right=True)
+    # plt.gca().yaxis.set_ticks([-2, -1, 0, 1])
+    plt.subplots_adjust(hspace=0.075)   # merge to share one x axis
+    # if save_figs: plt.savefig(plot_dir + 'Gpredfrom' + estimator + plot_comments + '.png', dpi=300) 
+
 
     return 
 
-def Gfrommodel(fit, dsub, lw, ll, layer='total', fab='legacy'):   # model params, thickness of substrate, leg width, and leg length in um
+def Gfrommodel(fit, dsub, lw, ll, layer='total', fab='legacy', Lscale=1.0, layer_ds=[]):   # model params, thickness of substrate, leg width, and leg length in um
     # predicts G_TES and error from our model and arbitrary bolo geometry, assumes microstrip on all four legs
     # thickness of wiring layers is independent of geometry
     # RETURNS [G prediction, prediction error]
@@ -457,12 +610,13 @@ def Gfrommodel(fit, dsub, lw, ll, layer='total', fab='legacy'):   # model params
         dW1 = .160*arrayconv; dI1 = .350*arrayconv; dW2 = .340*arrayconv; dI2 = .400*arrayconv   # film thicknesses, um
         w1w, w2w = wlw(lw, fab='bolotest', layer=layer)
     else: print('Invalid fab type, choose "legacy" or "bolotest."')
-    dW = .200**arrayconv
+    # dW = .200**arrayconv
 
-    GU = G_layer(fit, dsub, layer='U')*lw/7 *220/ll   # G prediction and error on substrate layer for one leg
-    GW = (G_layer(fit, dW1, layer='W')*w1w/5 + G_layer(fit, dW2, layer='W')*w2w/5) *220/ll  # G prediction and error from Nb layers for one leg
-    GW1 = G_layer(fit, dW, layer='W')*w1w/5 *220/ll  # G prediction and error from 200 nm Nb layer one leg
-    GI = (G_layer(fit, dI1, layer='I') + G_layer(fit, dI2, layer='I')) *lw/7 *220/ll   # G prediction and error on insulating layers for one leg
+    # pdb.set_trace()
+    GU = (G_layer(fit, dsub, layer='U')) * lw/7 * (220/ll)**Lscale   # G prediction and error on substrate layer for one leg
+    GW1 = G_layer(fit, dW1, layer='W') * w1w/5 * (220/ll)**Lscale  # G prediction and error from 200 nm Nb layer one leg
+    GW = (G_layer(fit, dW1, layer='W') * w1w/5 + G_layer(fit, dW2, layer='W') * w2w/5) * (220/ll)**Lscale  # G prediction and error from Nb layers for one leg
+    GI = (G_layer(fit, dI1, layer='I') + G_layer(fit, dI2, layer='I')) * lw/7 * (220/ll)**Lscale   # G prediction and error on insulating layers for one leg
     Gwire = GW + GI # G error for microstrip on one leg, summing error works because error is never negative here
 
     if layer=='total': return 4*(GU+Gwire)   # value and error, microstrip + substrate on four legs
@@ -473,7 +627,7 @@ def Gfrommodel(fit, dsub, lw, ll, layer='total', fab='legacy'):   # model params
     elif layer=='I': return 4*(GI)   # value and error, I1+I2 on four legs
     else: print('Invalid layer type.'); return
 
-def predict_Glegacy(fit, data1b=[], save_figs=False, estimator='model', kappas=np.array([[54.6, 67.1, 100.9], [6.7, 21.3, 4.7]]), title='', plot_comments='', fs=(7,6), plot_dir='/Users/angi/NIS/Bolotest_Analysis/plots/layer_extraction_analysis/'):
+def predict_Glegacy(fit, data1b=[], save_figs=False, estimator='model', kappas=np.array([[54.6, 67.1, 100.9], [6.7, 21.3, 4.7]]), title='', plot_comments='', fs=(7,6), Lscale=1, plot_dir='/Users/angi/NIS/Bolotest_Analysis/plots/layer_extraction_analysis/'):
     # predicts G for legacy TES data using alpha model, then plots prediction vs measurements (scaled to 170 mK)
     # legacy geometry and measurements are from Shannon's spreadsheet, then plots 
 
@@ -498,29 +652,31 @@ def predict_Glegacy(fit, data1b=[], save_figs=False, estimator='model', kappas=n
     ### predictions 
     if estimator=='model':   # make predictions using our model
         # fit_params, sigma_params = fit
-        Gpred, sigma_Gpred = Gfrommodel(fit, dsub, lw, ll)   # predictions and error from model [pW/K]
-        GpredW, sigma_GpredW = Gfrommodel(fit, dsub, lw, ll, layer='wiring')
-        GpredU, sigma_GpredU = Gfrommodel(fit, dsub, lw, ll, layer='U')
-    elif estimator=='kappa':   # make predictions using measured kappas
-        kappa, sigma_kappa = kappas
-        Gpred = Gfromkappas(kappa, dsub, lw, ll); sigma_Gpred = Gfromkappas(sigma_kappa, dsub, lw, ll)   # predictions and error from model [pW/K]
-        GpredW = Gfromkappas(kappa, dsub, lw, ll, layer='wiring'); GpredU = Gfromkappas(kappa, dsub, lw, ll, layer='U')   # break down into wiring and substrate contributions
+        Gpred, sigma_Gpred = Gfrommodel(fit, dsub, lw, ll, Lscale=Lscale)   # predictions and error from model [pW/K]
+        GpredW, sigma_GpredW = Gfrommodel(fit, dsub, lw, ll, layer='wiring', Lscale=Lscale)
+        GpredU, sigma_GpredU = Gfrommodel(fit, dsub, lw, ll, layer='U', Lscale=Lscale)
+    # elif estimator=='kappa':   # make predictions using measured kappas
+    #     kappa, sigma_kappa = kappas
+    #     Gpred = Gfromkappas(kappa, dsub, lw, ll); sigma_Gpred = Gfromkappas(sigma_kappa, dsub, lw, ll)   # predictions and error from model [pW/K]
+    #     GpredW = Gfromkappas(kappa, dsub, lw, ll, layer='wiring'); GpredU = Gfromkappas(kappa, dsub, lw, ll, layer='U')   # break down into wiring and substrate contributions
     else: print('Invalid estimator - choose "model" or "kappa"')
-    normres = (legacy_Gs - Gpred)/legacy_Gs*100   # normalized residuals [% data]
-    resylim = -600 if 'a01' in plot_comments else -100   # different lower limits on residuals depending on model
+    normres = (legacy_Gs - Gpred)/legacy_Gs   # normalized residuals [frac of data]
+    resylim = -6 if 'a01' in plot_comments else -2   # different lower limits on residuals depending on model
 
     plt.figure(figsize=fs)
-    gs = gridspec.GridSpec(2, 1, height_ratios=[3,1])
+    gs = gridspec.GridSpec(2, 1, height_ratios=[4,1])
     ax1 = plt.subplot(gs[0])   # model vs data
-    plt.scatter(legacy_AoLs, legacy_Gs, color='g', alpha=.7, label=r"Data")
-    plt.errorbar(legacy_AoLs, Gpred, yerr=sigma_Gpred, color='k', marker='*', label=r"G$_\text{TES}$", capsize=2, linestyle='None')
-    plt.errorbar(legacy_AoLs, GpredU, yerr=sigma_GpredU, color='blue', marker='+', label=r"G$_\text{sub}$", linestyle='None')
-    plt.errorbar(legacy_AoLs, GpredW, yerr=sigma_GpredW, color='mediumpurple', marker='x', label=r"G$_\text{micro}$", linestyle='None')      
-    plt.ylabel('G(170mK) [pW/K]')
+    plt.scatter(legacy_AoLs, legacy_Gs, color='g', alpha=.8, label=r"Legacy", s=40)
+    plt.errorbar(legacy_AoLs, Gpred, yerr=sigma_Gpred, color='k', marker='*', label=r"G$_\text{TES}$", capsize=2, linestyle='None', markersize=7)
+    # plt.errorbar(legacy_AoLs, GpredU, yerr=sigma_GpredU, color='blue', marker='+', label=r"G$_\text{sub}$", linestyle='None')
+    # plt.errorbar(legacy_AoLs, GpredW, yerr=sigma_GpredW, color='mediumpurple', marker='x', label=r"G$_\text{micro}$", linestyle='None')  
+    plt.scatter(legacy_AoLs, GpredU, color='mediumblue', marker='+', label=r"G$_\text{sub}$", linestyle='None', s=60)
+    plt.scatter(legacy_AoLs, GpredW, color='darkorchid', marker='x', label=r"G$_\text{micro}$", linestyle='None', s=40)      
+    plt.ylabel('\\textbf{G(170mK) [pW/K]}')
     plt.title(title)
     plt.tick_params(axis="y", which="both", right=True)
     plt.yscale('log'); plt.xscale('log')
-    plt.ylim(1,1E3)
+    plt.ylim(2,1.8E3)
     plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)   # turn x ticks off
 
     if len(data1b)==2:   # plot bolotest 1b data and prediction
@@ -529,9 +685,9 @@ def predict_Glegacy(fit, data1b=[], save_figs=False, estimator='model', kappas=n
         if estimator=='model':
             Gpred1b_U = Gfrommodel(fit, .420, 7, 220, layer='U', fab='bolotest')
             Gpred1b_wire = Gfrommodel(fit, .420, 7, 220, layer='wiring', fab='bolotest')
-        elif estimator=='kappa':
-            Gpred1b_U = Gfromkappas(kappa, .420, 7, 220, layer='U', fab='bolotest')
-            Gpred1b_wire = Gfromkappas(kappa, .420, 7, 220, layer='wiring', fab='bolotest')  
+        # elif estimator=='kappa':
+        #     Gpred1b_U = Gfromkappas(kappa, .420, 7, 220, layer='U', fab='bolotest')
+        #     Gpred1b_wire = Gfromkappas(kappa, .420, 7, 220, layer='wiring', fab='bolotest')  
         if len(Gpred1b_U)==2:   # includes errors on prediction
             plt.errorbar(AoL_bolo[0], Gpred1b_wire[0]+Gpred1b_U[0], yerr=Gpred1b_wire[1]+Gpred1b_U[1], marker='*', color='purple')
             plt.errorbar(AoL_bolo[0], Gpred1b_U[0], yerr=Gpred1b_U[1], marker='+', color='purple')
@@ -545,22 +701,158 @@ def predict_Glegacy(fit, data1b=[], save_figs=False, estimator='model', kappas=n
 
     # plt.gca().yaxis.set_ticks([1E1, 1E2, 1E3])
     handles, labels = ax1.get_legend_handles_labels()
-    plt.legend([handles[idx] for idx in lorder],[labels[idx] for idx in lorder], loc=2)   # 2 is upper left, 4 is lower right
+    plt.legend([handles[idx] for idx in lorder],[labels[idx] for idx in lorder], loc=4)   # 2 is upper left, 4 is lower right
 
     ax2 = plt.subplot(gs[1], sharex=ax1)   # residuals
-    plt.axhline(0, color='k', ls='--')
-    plt.scatter(legacy_AoLs, normres, color='r')
-    if len(data1b)==3: plt.scatter(data1b[0], (data1b[1]-Gpred1b_wire[0]-Gpred1b_U[0])/data1b[1]*100, color='purple')
-    plt.ylabel("Res'ls [$\%$G]")
+    plt.axhline(0, color='k', alpha=0.7)
+    plt.scatter(legacy_AoLs, normres, color='g', s=40, alpha=0.8)
+    if len(data1b)==2: plt.scatter(data1b[0], (data1b[1]-Gpred1b_wire[0]-Gpred1b_U[0])/data1b[1]*100, color='purple')
+    plt.ylabel("\\textbf{Norm. Res.}")
     plt.xlabel('Leg A/L [$\mu$m]')
-    plt.ylim(resylim,100)
+    plt.ylim(resylim,1)
     plt.tick_params(axis="y", which="both", right=True)
-    plt.gca().yaxis.set_ticks([-100, -50, 50, 100])
+    plt.gca().yaxis.set_ticks([-2, -1, 0, 1])
     plt.subplots_adjust(hspace=0.075)   # merge to share one x axis
     if save_figs: plt.savefig(plot_dir + 'Gpredfrom' + estimator + plot_comments + '.png', dpi=300) 
 
     return Gpred, sigma_Gpred, normres
 
+def A_bolotest(lw, layer='wiring'):   # area of bolotest bolos for four legs
+    if layer=='wiring':
+        dsub = .420; dW1 = .160; dI1 = .350; dW2 = .340; dI2 = .400   # film thicknesses, um
+    elif layer=='W1':
+        dsub = .420; dW1 = .160; dI1 = 0; dW2 = 0; dI2 = 0   # film thicknesses, um
+    elif layer=='bare':
+        dsub = .420; dW1 = 0; dI1 = 0; dW2 = 0; dI2 = 0   # film thicknesses, um
+    w1w, w2w = wlw(lw, fab='bolotest', layer=layer)
+    return (lw*dsub + w1w*dW1 + w2w*dW2 + lw*dI1 +lw*dI2)*4   # area of four legs 
+    
+
+def plot_GandTFNEP(fit, lwidths, Tc=0.170, ll=220, dsub=0.420, plot_Gerr=True, plot_NEPerr=False, plot_vAoL=False, save_fig=False, plot_dir='./', Glims=[], NEPlims=[], plotG=True):
+
+    # plots GTES and thermal fluctuation noise equivalent power predictions from the alpha model vs leg width
+    # G values in pW/K, leg dimensions in um, temperature in K
+    # can turn off/on G_TES errors and NEP errors
+    # plots GTES and TFNEP vs leg area/length
+    
+    # predict G assuming four legs of one type
+    G_full, Gerr_full = Gfrommodel(fit, dsub, lwidths, ll, layer='total', fab='bolotest')   #G(S + microstrip), four legs
+    # G_U, Gerr_U = Gfrommodel(fit, dsub, lwidths, ll, layer='U', fab='bolotest')/2 + Gfrommodel(fit, dsub, lwidths, ll, layer='total', fab='bolotest')/2
+    # G_W1, Gerr_W1 = Gfrommodel(fit, dsub, lwidths, ll, layer='W1', fab='bolotest')/2 + Gfrommodel(fit, dsub, lwidths, ll, layer='total', fab='bolotest')/2
+    # G_Nb200 = G_U+G_W1; Gerr_Nb200 = Gerr_U+Gerr_W1
+    # G_bare, Gerr_bare = Gfrommodel(fit, .340, lwidths, ll, layer='U', fab='bolotest') + Gfrommodel(fit, dsub, lwidths, ll, layer='total', fab='bolotest')/2   # bare substrate is thinner from etching steps
+    # G_U, Gerr_U = Gfrommodel(fit, dsub, lwidths, ll, layer='U', fab='bolotest') 
+    G_W1, Gerr_W1 = Gfrommodel(fit, dsub, lwidths, ll, layer='U', fab='bolotest') + Gfrommodel(fit, dsub, lwidths, ll, layer='W1', fab='bolotest')   # G(S+W1), four legs
+    G_S, Gerr_S = Gfrommodel(fit, dsub, lwidths, ll, layer='U', fab='bolotest')  # assuming G(TES) = G(substrate) on four legs
+
+
+    # predicted G vs substrate width
+    if plotG:
+
+        NEP_full = TFNEP(Tc, G_full*1E-12)*1E18; NEPerr_full = sigma_NEP(Tc, G_full*1E-12, Gerr_full*1E-12)*1E18   # aW / rtHz; Kenyan 2006 measured 1E-17 for a TES with comparable G at 170 mK
+        NEP_W1 = TFNEP(Tc, G_W1*1E-12)*1E18; NEPerr_W1 = sigma_NEP(Tc, G_W1*1E-12, Gerr_W1*1E-12)*1E18   # aW / rtHz; Kenyan 2006 measured 1E-17 for a TES with comparable G at 170 mK
+        NEP_S = TFNEP(Tc, G_S*1E-12)*1E18; NEPerr_S = sigma_NEP(Tc, G_S*1E-12, Gerr_S*1E-12)*1E18   # aW / rtHz; Kenyan 2006 measured 1E-17 for a TES with comparable G at 170 mK
+
+        fig, ax1 = plt.subplots() 
+        ax1.plot(lwidths, G_full, color='rebeccapurple', label='G$_\\text{TES}$, Microstrip', alpha=0.8) 
+        ax1.plot(lwidths, G_W1, color='green', label='G$_\\text{TES}$, 200nm Nb', alpha=0.8) 
+        ax1.plot(lwidths, G_S, color='royalblue', label='G$_\\text{TES}$, Bare S', alpha=0.8)
+        if plot_Gerr:
+            plt.fill_between(lwidths, G_full-Gerr_full, G_full+Gerr_full, facecolor="mediumpurple", alpha=0.2)   # error
+            plt.fill_between(lwidths, G_W1-Gerr_W1, G_W1+Gerr_W1, facecolor="limegreen", alpha=0.2)   # error
+            plt.fill_between(lwidths, G_S-Gerr_S, G_S+Gerr_S, facecolor="cornflowerblue", alpha=0.2)   # error
+        ax1.set_xlabel('Substrate Width [$\mu$m]') 
+        ax1.set_ylabel('G$_\\text{TES}$(170mK) [pW/K]') 
+        if len(Glims)>0: ax1.set_ylim(ymin=Glims[0], ymax=Glims[1])   # user specified G y-axis limits
+
+        # TFNEP vs substrate width
+        ax2 = ax1.twinx() 
+        ax2.plot(lwidths, NEP_full, '--', color='rebeccapurple', label='NEP')   # this varies as G^1/2
+        ax2.plot(lwidths, NEP_W1, '--', color='green', label='NEP')   # this varies as G^1/2
+        ax2.plot(lwidths, NEP_S, '--', color='royalblue', label='NEP')   # this varies as G^1/2
+        if plot_NEPerr: 
+            plt.fill_between(lwidths, NEP_full-NEPerr_full, NEP_full+NEPerr_full, facecolor="rebeccapurple", alpha=0.2)   # error
+            plt.fill_between(lwidths, NEP_W1-NEPerr_W1, NEP_W1+NEPerr_W1, facecolor="green", alpha=0.2)   # error
+            plt.fill_between(lwidths, NEP_S-NEPerr_S, NEP_S+NEPerr_S, facecolor="royalblue", alpha=0.2)   # error
+        if len(NEPlims)>0: ax2.set_ylim(ymin=NEPlims[0], ymax=NEPlims[1])   # user specified TFNEP y-axis limits
+        ax2.set_ylabel('Thermal Fluctuation NEP [aW/$\sqrt{Hz}$]')     
+
+        h1, l1 = ax1.get_legend_handles_labels(); h2, l2 = ax2.get_legend_handles_labels()
+        ax1.legend(h1+h2, l1+l2, loc='upper left', fontsize='12', ncol=2)
+        plt.tight_layout()
+        if save_fig: plt.savefig(plot_dir + 'design_implications.png', dpi=300)
+
+
+        if plot_vAoL:   # predicted G and NEP vs leg A/L
+            A_full = A_bolotest(lwidths, layer='wiring'); A_W1 = A_bolotest(lwidths, layer='W1'); A_S = A_bolotest(lwidths, layer='bare')   # areas of different film stacks
+
+            fig, ax1 = plt.subplots()   # TES thermal conductance
+            ax1.plot(A_full/ll, G_full, color='rebeccapurple', label='G$_\\text{TES}$, Microstrip', alpha=0.8) 
+            ax1.plot(A_W1/ll, G_W1, color='green', label='G$_\\text{TES}$, 200nm Nb', alpha=0.8) 
+            ax1.plot(A_S/ll, G_S, color='royalblue', label='G$_\\text{TES}$, Bare', alpha=0.8)
+            if plot_Gerr:
+                plt.fill_between(A_full/ll, G_full-Gerr_full, G_full+Gerr_full, facecolor="mediumpurple", alpha=0.2)   # error
+                plt.fill_between(A_W1/ll, G_W1-Gerr_W1, G_W1+Gerr_W1, facecolor="limegreen", alpha=0.2)   # error
+                plt.fill_between(A_S/ll, G_S-Gerr_S, G_S+Gerr_S, facecolor="cornflowerblue", alpha=0.2)   # error
+            ax1.set_xlabel('TES Leg A/L [$\mu$m]') 
+            ax1.set_ylabel('G$_\\text{TES}$ [pW/K]') 
+            ax1.set_ylim(ymin=Glims[0], ymax=Glims[1]) 
+
+            ax2 = ax1.twinx()   # thermal fluctuation NEP
+            ax2.plot(A_full/ll, NEP_full, '--', color='rebeccapurple', label='NEP')   # this varies as G^1/2
+            ax2.plot(A_W1/ll, NEP_W1, '--', color='green', label='NEP')   # this varies as G^1/2
+            ax2.plot(A_S/ll, NEP_S, '--', color='royalblue', label='NEP')   # this varies as G^1/2
+            if plot_NEPerr:
+                plt.fill_between(A_full/ll, NEP_full-NEPerr_full, NEP_full+NEPerr_full, facecolor="rebeccapurple", alpha=0.2)   # error
+                plt.fill_between(A_W1/ll, NEP_W1-NEPerr_W1, NEP_W1+NEPerr_W1, facecolor="green", alpha=0.2)   # error
+                plt.fill_between(A_S/ll, NEP_S-NEPerr_S, NEP_S+NEPerr_S, facecolor="royalblue", alpha=0.2)   # error
+            ax2.set_ylim(ymin=NEPlims[0], ymax=NEPlims[1]) 
+            ax2.set_ylabel('Thermal Fluctuation NEP [aW/$\sqrt{Hz}$]')     
+            ax2.set_xlim(np.nanmin(A_full/ll)-0.1*np.nanmax(A_full/ll), np.nanmax(A_full/ll)*1.1)
+
+            h1, l1 = ax1.get_legend_handles_labels()
+            h2, l2 = ax2.get_legend_handles_labels()
+            ax1.legend(h1+h2, l1+l2, loc='upper left', fontsize='12', ncol=2)
+            plt.tight_layout()
+        if save_fig: plt.savefig(plot_dir + 'design_implications_AL.png', dpi=300) 
+
+    else:   # plot NEP^2
+        # pdb.set_trace()
+        NEPfull_sq = (TFNEP(Tc, G_full*1E-12))**2*1E36; NEPerrfull_sq = sigmaNEP_sq(Tc, G_full*1E-12, Gerr_full*1E-12)*1E36   # aW^2 / Hz; Kenyan 2006 measured (1E-17)^2 for a TES with comparable G at 170 mK
+        NEPW1_sq = (TFNEP(Tc, G_W1*1E-12))**2*1E36; NEPerrW1_sq = sigmaNEP_sq(Tc, G_W1*1E-12, Gerr_W1*1E-12)*1E36   # aW^2 / Hz; Kenyan 2006 measured 1E-17 for a TES with comparable G at 170 mK
+        NEPS_sq = (TFNEP(Tc, G_S*1E-12)**2)*1E36; NEPerrS_sq = sigmaNEP_sq(Tc, G_S*1E-12, Gerr_S*1E-12)*1E36   # aW^2 / Hz; Kenyan 2006 measured 1E-17 for a TES with comparable G at 170 mK
+
+        # Compare to SPIDER NEP?
+        Psat_sp = 3E-12   # W; SPIDER 280 GHz target Psat; Hubmayr 2019
+        # NEP_spider = 17E-18   # W/rt(Hz), detector NEP of 90 and 150 GHz SPIDER bolos, Mauskopf et al 2018
+        # NEP_FIR = 1E-20   # W/rt(Hz), NEP necessary to do background limited FIR spectroscopy, Kenyon et al 2006
+        NEP_Psat = TFNEP(0.170, Psat_sp/(0.170-0.100), Tb=0.100)*1E18   # NEP for target SPIDER Psat at 100 mK; aW/rt(Hz); G(Tc)~Psat/(Tc-Tb)
+
+        plt.figure(figsize=(5.5,5))
+        plt.plot(lwidths, NEPfull_sq, color='rebeccapurple', label='S+Micro')  
+        plt.plot(lwidths, NEPW1_sq, color='green', label='S+W1')   
+        plt.plot(lwidths, NEPS_sq, color='royalblue', label='S')  
+        # plt.axhline((NEP_FIR)**2*1E36, label='FIR Spec', color='black')
+        # plt.fill_between([0,16], 0, (NEP_FIR)**2*1E36, facecolor="black", alpha=0.1)   # FIR spectroscopy NEP limits
+        # plt.axhline((NEP_sp)**2, label='SPIDER 280 GHz', color='black')
+        # plt.fill_between([0,16], 0, (NEP_sp)**2, facecolor="black", alpha=0.1)   # FIR spectroscopy NEP limits
+        # plt.axhline((NEP_Psat)**2, label='SPIDER Loading', color='black')
+        # plt.fill_between([0,16], 0, (NEP_Psat)**2, facecolor="black", alpha=0.1)   # FIR spectroscopy NEP limits
+                
+        if plot_NEPerr: 
+            plt.fill_between(lwidths, NEPfull_sq-NEPerrfull_sq, NEPfull_sq+NEPerrfull_sq, facecolor="rebeccapurple", alpha=0.3)   # error
+            plt.fill_between(lwidths, NEPW1_sq-NEPerrW1_sq, NEPW1_sq+NEPerrW1_sq, facecolor="green", alpha=0.3)   # error
+            plt.fill_between(lwidths, NEPS_sq-NEPerrS_sq, NEPS_sq+NEPerrS_sq, facecolor="royalblue", alpha=0.3)   # error
+        if len(NEPlims)>0: plt.ylim(ymin=NEPlims[0], ymax=NEPlims[1])   # user specified TFNEP y-axis limits
+        plt.xlim(min(lwidths)-max(lwidths)*0.02, max(lwidths)*1.02)
+        plt.ylim(0,35)
+        plt.ylabel('NEP$_\\text{TF}^2$ [aW$^2$/Hz]', fontsize='18')     
+        plt.xlabel('S Width [$\mu$m]', fontsize='18') 
+        plt.legend(loc='upper left', fontsize='16')
+        plt.tight_layout()
+        if save_fig: plt.savefig(plot_dir + 'design_implications.png', dpi=500) 
+
+        return np.array([NEPfull_sq, NEPerrfull_sq])   # aW^2/Hz for bolo with microstrip on all four legs
 
 ### analyze results and compare with literature values
 def phonon_wlength(vs, T, domcoeff=2.82):   # returns dominant phonon wavelength in vel units * s (probably um)
@@ -611,25 +903,45 @@ def kappa_permfp(T, material=''):   # Leopold and Boorse 1964, Nb
 def I_mfp(x):
     return x/2 * np.arcsinh(x) + 1/6*((1+x**2)**(1/2) * (x**2-2) + (2-x**3))
 
-def sumfunc_J(n, f, J):   # function to J sum over
-    if J==0:   # handle divide by 0 error
-        return f*(1-f)**J * ( n**3 * ((J+1)**3 * I_mfp(1/(n*(J+1))) - J**3 * 0 ) + 1/2*(2-1) * (I_mfp(n*(J+1)) - 2*I_mfp(n*J) + I_mfp(n*(J-1))) )
-        # return f*(1-f)**J * ( n**3 * ((J+1)**3 * I_mfp(1/(n*(J+1))) - J**3 * 0 ) + 1/2*(2-1) * (I_mfp(n*(J+1)) - 2*I_mfp(n*J) ) )
-        # return f*(1-f)**J * ( n**3 * ((J+1)**3 * I_mfp(1/(n*(J+1))) - 0) + 0 )
-    elif J>0:
-        return f*(1-f)**J * ( n**3 * ((J+1)**3 * I_mfp(1/(n*(J+1))) - J**3 * I_mfp(1/(n*J))) + 1/2*(2-0) * (I_mfp(n*(J+1)) - 2*I_mfp(n*J) + I_mfp(n*(J-1))) )
+def firstterm(n, J):
+    subJ = 1E-5 if J==0 else J
+    return n**3 * ( (J+1)**3 * I_mfp( 1/(n*(J+1)) ) - J**3 * I_mfp( 1/(n*subJ) ) )
+
+def secondterm(n, J):
+    kdelta = 1 if J == 0 else 0
+    return 1/2 * (2-kdelta) * ( I_mfp(n*(J+1)) - 2*I_mfp(n*J) +  I_mfp(n*(J-1)) )
+
+def sumfunc_J(n, f, J):  
+    if J==0:   
+        kdelta = 1  # kroniker delta function
+        Jsub = 1E-10   # handle divide by 0 error when J = 0; first and second terms converge to a scalar value for J < 1E-4
+    elif J > 0:
+        kdelta = 0
+        Jsub = J
     else:
-        print('J cannot be <0. Returning NaN')
+        print('J cannot be < 0. Returning NaN')
         return np.nan
+    
+    # how to handle division by zero?
+    firstterm = n**3 * ( (J+1)**3 * I_mfp( 1/(n*(J+1)) ) - J**3 * I_mfp( 1/(n*Jsub) ) )
+    secondterm = 1/2 * (2-kdelta) * ( I_mfp(n*(J+1)) - 2*I_mfp(n*J) +  I_mfp(n*(J-1)) )
+    # pdb.set_trace()
+    return f*(1-f)**J * (firstterm + secondterm)   # initial interpretation of Wybourne
+    # return f**J*(1-f) * (firstterm + secondterm)
+    # return f*(1-f) * (firstterm + secondterm)
+
 
 def l_eff(w, d, f, sumlim=1E3):   # boundary-limited phonon mfp including spectral scattering from Wybourne84
     # inputs are leg width and thickness in the same units (probably um); w>d
     # f is fraction of diffusive reflection (1-f is fraction of spectral reflection)
     # J is the number of times a phonon impinges on the surface before being diffusively scattered
+
     n = w/d   # aspect ratio
     # print(n)
     Jfunc_vals = [sumfunc_J(n, f, J) for J in np.arange(sumlim)]   # should be an infinite sum but converges pretty quickly
     mfp = 3*d/(2*n) * np.sum(Jfunc_vals, axis=0)  # same units as d, probably um
+    # pdb.set_trace()
+
     return mfp
 
 def l_bl(w, d):   # boundary-limited phonon mfp from Wybourne84
@@ -653,14 +965,18 @@ def l_PLT02(vs):   # mfp at 170 mK for amorphous solids from dominant phonon wav
     invQ = 3E-4   # at 170 mK
     return phonon_wlength(vs, 0.170)/(2*np.pi*invQ)
 
-def TFNEP(T, G):   # calculate thermal fluctuation noise equivalent power as a function of G and T
-    return np.sqrt(4*kB*G)*T
+def monopower(x, m, t, b):
+    return m * x**t + b  
 
-def sigma_NEP(T, G, sigma_G):   # error on NEP estimation
-    sigma_nepsq = kB/G*T**2 * sigma_G**2
-    return np.sqrt(sigma_nepsq)
+def fit_power(x, y, p0, sigma=[], absolute_sigma=True):
+    # returns power explicitly 
+    # idk if this is lazy or actually extra work
 
-def GandPsatfromNEP(NEP, Tc, Tb, gamma=1):   # calculate G(Tc) and Psat(Tc) given thermal fluctuation NEP, Tc in K, and Tbath in K
-    G_Tc = (NEP/Tc)**2 / (4*kB*gamma)   # W/K
-    P_Tc = G_Tc*(Tc-Tb)   # W
-    return np.array([G_Tc, P_Tc])
+    # check for nans
+    if np.isnan(np.sum(y)):
+        print('Ignoring NaNs while fitting power law')
+    sinds = np.where(~np.isnan(y))[0]   # scalar indices
+
+    params, pcov = curve_fit(monopower, x[sinds], y[sinds], p0, sigma=sigma[sinds], absolute_sigma=absolute_sigma)
+    perr = np.sqrt(np.diag(pcov)); t = params[1]; sigma_t = perr[1]
+    return params, t, sigma_t
