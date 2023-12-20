@@ -597,7 +597,6 @@ def fit_powerlaws(ivs, save_figs=False, fitGexplicit=True, perRn_toquote=80, Tb_
         end_ind = np.max(np.where(((rtes[Tbq_ind]/Rn)>.2) & (rtes[Tbq_ind]!=np.nan)))
         vtes_tran = vtes[Tbq_ind, start_ind:end_ind]
         ites_tran = ites[Tbq_ind, start_ind:end_ind]
-        # rtes_tran = rtes[Tbq_ind, start_ind:end_ind]
 
         # calculate Psat
         ptes_tran = vtes_tran * ites_tran
@@ -635,9 +634,9 @@ def fit_powerlaws(ivs, save_figs=False, fitGexplicit=True, perRn_toquote=80, Tb_
         ivs[tesid]['Psat@'+str(round(Tb_toquote*1e3))+'mK [pW], IV'] =  Psat*1e12
         ivs[tesid]['Psat_err@'+str(round(Tb_toquote*1e3))+'mK [pW], IV'] =  Psat_err*1e12
         ivs[tesid]['Psat@'+str(round(Tb_toquote*1e3))+'mK [pW], Calc'] =  Psat_calc*1e12
-        ivs[tesid]['TbsToReturn'] = TbsToReturn
+        ivs[tesid]['TbsToReturn'] = TbsToReturn*1E3   # mK
         ivs[tesid]['Tb_inds'] = Tb_inds
-        ivs[tesid]['Tb_toquote'] = Tb_toquote
+        ivs[tesid]['Tb_toquote'] = Tb_toquote*1E3   # mK
         ivs[tesid]['perRn'] = perRn 
         ivs[tesid]['perRn_toquote'] = perRn_toquote
 
@@ -685,8 +684,7 @@ def plotfit_singlebolo(ivs, tesid, save_figs=False, fn_comments='',
     ### wrapper to fit power law of single bolometer and plot results only from chosen %Rn
     ### uses const_T = quote constant T_TES fit values vs values at a particular T_TES
 
-
-    tes = TESAnalyze()
+    tes = TESAnalyze()   # initialize single bolo object
 
     Rn = ivs[tesid]['Rn [mOhms]']*1E-3; Rn_err = ivs[tesid]['Rn_err [mOhms]']*1E-3   # mohms
     p_pnts = ivs[tesid]['ptes_int']; sigma_p = ivs[tesid]['ptes_err']   # TES power at % Rns from interpolated IV points            
@@ -704,13 +702,8 @@ def plotfit_singlebolo(ivs, tesid, save_figs=False, fn_comments='',
     GTc = ivs[tesid]['G@Tc [pW/K]']; GTc_err = ivs[tesid]['G_err@Tc [pW/K]']   
     G170 = ivs[tesid]['G@170mK [pW/K]']; G170_err = ivs[tesid]['G_err@170mK [pW/K]']
     PsatIV = ivs[tesid]['Psat@'+str(round(Tb_toquote*1e3))+'mK [pW], IV']; Psaterr = ivs[tesid]['Psat_err@'+str(round(Tb_toquote*1e3))+'mK [pW], IV']
-
     Tbaths = np.array(ivs[tesid]['Tbaths'])
     prn_ind = np.where(perRn==perRn_toquote)[0][0]
-    # Tbq_ind = np.where(Tbaths==Tb_toquote)[0][0]
-    # Tb_inds = np.where(Tbaths==TbsToReturn)[0][0]
-    # TbsToReturn = Tbaths[Tb_inds]Tbath
-    # Tb_toquote = Tbaths[Tbq_ind]
     print('Quoting Results at Tbath = {Tb} mK'.format(Tb = round(Tb_toquote, ndigits=4)*1E3))
     
     print(' ')
@@ -726,26 +719,19 @@ def plotfit_singlebolo(ivs, tesid, save_figs=False, fn_comments='',
     tsort = np.argsort(Tbaths)
     for tt in tsort:
         finds = np.isfinite(ites[tt])
-        # plt.plot(v_pnts[tt]*1e6, i_pnts[tt]*1e3, 'o', alpha=0.7, color=plt.cm.plasma((Tbaths[tt]-0.070)/(0.170)))   # interpolated IV points
         plt.plot(vtes[tt][finds]*1e6, ites[tt][finds]*1e3, alpha=0.6, label='{} mK'.format(round(Tbaths[tt]*1E3)), color=plt.cm.plasma((Tbaths[tt]-0.070)/(0.170)))   # IVs
-    # plt.plot(v_pnts[:,prn_ind]*1e6, i_pnts[:,prn_ind]*1e3, label='{} % Rn'.format(perRn_toquote))
-    # v_pRntoplot = np.array([min(v_pnts[:,prn_ind])/3, v_pnts[:,prn_ind]])*2e6
     v_pRnplot = np.append(0, max(v_pnts[:,prn_ind]))*5e6
     i_pRnplot = np.append(0, max(i_pnts[:,prn_ind]))*5e3   
-    # # plt.plot(v_pnts[:,prn_ind]*2e6, i_pnts[:,prn_ind]*2e3, 'k--')
     plt.plot(v_pRnplot, i_pRnplot, 'k--', label='{}% R$_N$'.format(perRn_toquote))
-    # plt.annotate('{} % R$_N$'.format(perRn_toquote), (max(v_pnts[:,prn_ind])*1e6, max(i_pnts[:,prn_ind])*1.4e3))
     plt.xlabel('Voltage [$\mu$V]')
     plt.ylabel('Current [mA]')
-    plt.xlim(-0.008, 0.200); #plt.ylim(-0.001,0.1)
+    plt.xlim(-0.008, 0.200); 
 
     handles, labels = plt.gca().get_legend_handles_labels()
     linds = np.append(Tb_inds, -1)   # include %Rn label
     plt.legend([handles[ii] for ii in linds], [labels[ii] for ii in linds], loc=(0.15, 0.6))
-    # plt.legend([handles[ii] for ii in linds], [labels[ii] for ii in linds])
 
     # power law fit subplot
-    a = plt.axes([0.575, 0.45, .25, .35])
     if fitGexplicit:
         fitfnct = tes.tespowerlaw_fitfunc_G 
         pfit = np.array([GTc*1E-12, n, Tc*1E-3])
@@ -754,6 +740,7 @@ def plotfit_singlebolo(ivs, tesid, save_figs=False, fn_comments='',
         pfit = np.array([k, n, Tc*1E-3])
 
     # power law fit inset
+    a = plt.axes([0.575, 0.45, .25, .35])
     temp_pnts = np.linspace(min(Tbaths)*1E-3 - 0.01, Tc*1E-3+0.01,25)
     plt.plot(temp_pnts*1e3, fitfnct(temp_pnts, *pfit)*1e12, color='k', alpha=0.8)   # power law fit
     plt.errorbar(Tbaths*1e3, p_pnts[:,prn_ind]*1e12, yerr=sigma_p[:,prn_ind]*1e12, fmt='o', color='k', alpha=0.8)   # data points
@@ -761,11 +748,7 @@ def plotfit_singlebolo(ivs, tesid, save_figs=False, fn_comments='',
     plt.ylabel('Power [pW]')
     plt.title('Power Law Fit')
     plt.xlim(0, 180)
-    # if save_figs: plt.savefig(bolotest_dir + 'Plots/IVs/pad' + pad + '_interpIVs' + fn_comments + '.png', dpi=300)
-
-
-
-
+    if save_figs: plt.savefig(bolotest_dir + 'Plots/IVs/tes' + tesid + '_IVsandfit' + fn_comments + '.png', dpi=300)
 
 
     return ivs
