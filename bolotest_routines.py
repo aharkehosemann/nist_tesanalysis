@@ -167,7 +167,7 @@ def Gfrommodel(fit, dsub, lw, ll, layer='total', fab='legacy', Lscale=1.0, layer
         if len(layer_ds)==10:   # original number of unique film thicknesses
             dW1 = layer_ds[3]*arrayconv; dI1 = layer_ds[5]*arrayconv; dW2 = layer_ds[7]*arrayconv; dI2 = layer_ds[9]*arrayconv   # film thicknesses for microstrip, um
         elif len(layer_ds)==11:   # added one more layer thickness after FIB measurements Feb 2024
-            dS_ABD, dS_CF, dS_E, dS_G, dW1_ABD, dW_E, dI1_ABC, dI_DF, dW2_AC, dW2_B, dI2_AC = layer_ds
+            dS_ABD, dS_CF, dS_E, dS_G, dW1_ABD, dW1_E, dI1_ABC, dI_DF, dW2_AC, dW2_B, dI2_AC = layer_ds
             dW1 = dW1_ABD*arrayconv; dI1 = dI1_ABC*arrayconv; dW2 = dW2_AC*arrayconv; dI2 = dI2_AC*arrayconv   # film thicknesses for microstrip, um
         w1w = 2; w2w = 4   # um
         # w1w, w2w = wlw(lw, fab='bolotest', layer=layer)
@@ -214,15 +214,15 @@ def Gbolotest(fit, layer='total', layer_ds=np.array([0.420, 0.400, 0.340, 0.160,
         dS_ABDE, dS_CF, dS_G, dW1_ABD, dW1_E, dI1_ABC, dI1_DF, dW2_AC, dW2_BE, dI2_ACDF = layer_ds
         # dS_ABD, dS_CF, dS_G, dW1_ABD, dW1_E, dI1_ABC, dI1_DF, dW2_AC, dW2_B, dI2_ACDF = layer_ds
         dW2_B = dW2_BE; dI2_AC = dI2_ACDF; dS_ABD = dS_ABDE; dS_E = dS_ABDE   # handle renaming 
-        dW_E = dW1_E+dW2_B; dI_DF = dI1_DF +dI2_ACDF   # handle combining W and I stacks
+        dW1_E = dW1_E+dW2_B; dI_DF = dI1_DF +dI2_ACDF   # handle combining W and I stacks
     elif len(layer_ds)==11:   # added one more layer thickness after FIB measurements Feb 2024
-        dS_ABD, dS_CF, dS_E, dS_G, dW1_ABD, dW_E, dI1_ABC, dI_DF, dW2_AC, dW2_B, dI2_AC = layer_ds
+        dS_ABD, dS_CF, dS_E, dS_G, dW1_ABD, dW1_E, dI1_ABC, dI_DF, dW2_AC, dW2_B, dI2_AC = layer_ds
 
     G_legA = G_layer(fit, dS_ABD, layer='U')*include_U + G_layer(fit, dW1_ABD, layer='W')*include_W + G_layer(fit, dI1_ABC, layer='I')*include_I + G_layer(fit, dW2_AC, layer='W')*3/5*include_W + G_layer(fit, dI2_AC, layer='I')*include_I # S-W1-I1-W2-I2
     G_legB = G_layer(fit, dS_ABD, layer='U')*include_U + G_layer(fit, dW1_ABD, layer='W')*include_W + G_layer(fit, dI1_ABC, layer='I')*3/7*include_I + G_layer(fit, dW2_B, layer='W')*3/5*include_W   # S-W1-I1-W2
     G_legC = G_layer(fit, dS_CF, layer='U')*include_U + G_layer(fit, dI1_ABC, layer='I') + G_layer(fit, dW2_AC, layer='W')*3/5*include_W + G_layer(fit, dI2_AC, layer='I')*include_I   # S-I1-W2-I2
     G_legD = G_layer(fit, dS_ABD, layer='U')*include_U + G_layer(fit, dW1_ABD, layer='W')*include_W + G_layer(fit, dI_DF, layer='I')*include_I   # S-W1-I1-I2 (I stack)
-    G_legE = G_layer(fit, dS_E, layer='U')*include_U + G_layer(fit, dW_E, layer='W')*3/5*include_W   # S-W1-W2 (W stack)
+    G_legE = G_layer(fit, dS_E, layer='U')*include_U + G_layer(fit, dW1_E, layer='W')*3/5*include_W   # S-W1-W2 (W stack)
     G_legF = G_layer(fit, dS_CF, layer='U')*include_U + G_layer(fit, dI_DF, layer='I')*include_I   # S-I1-I2 (I stack)
     G_legG = G_layer(fit, dS_G, layer='U')*include_U   # bare S 
 
@@ -254,14 +254,8 @@ def chisq_val(params, args, model='default', layer_ds=np.array([0.420, 0.400, 0.
         ydata, sigma, layer_ds = args
     elif len(args)==2:
         ydata, sigma = args
-
-    # if model=='default':
-    #     Gbolos_model = Gbolotest(params, layer_ds=layer_ds)   # predicted G of each bolo
-    # elif model=='six_layers':   # model SiOx as it's own layer
-    #     Gbolos_model = Gbolos_six(params)
     Gbolos_model = Gbolotest(params, layer_ds=layer_ds)   # predicted G of each bolo
     chisq_vals = (Gbolos_model-ydata)**2/sigma**2
-
     
     return np.sum(chisq_vals)
 
@@ -274,12 +268,13 @@ def calc_func_grid(params, data, layer_ds=np.array([0.420, 0.400, 0.340, 0.160, 
             func_grid[rr, cc] = chisq_val(params_rc, data, layer_ds=layer_ds)
     return func_grid
 
-def runsim_chisq(num_its, p0, data, bounds, plot_dir, show_yplots=False, save_figs=False, fn_comments='', save_sim=False, sim_file=None, vary_thickness=False, derr=0.0, layer_d0=np.array([0.420, 0.400, 0.340, 0.160, 0.100, 0.350, 0.270, 0.340, 0.285, 0.400])):  
+def runsim_chisq(num_its, p0, data, bounds, plot_dir, show_simGdata=False, save_figs=False, fn_comments='', save_sim=False, sim_file=None,
+                  vary_thickness=False, derr=0.0, layer_d0=np.array([0.420, 0.400, 0.340, 0.160, 0.100, 0.350, 0.270, 0.340, 0.285, 0.400]),
+                  derrs = np.array([0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.])):  
     # returns G and alpha fit parameters
     # returned G's have units of ydata (most likely pW/K)
 
-
-    print('\n'); print('Running Minimization MC Simulation'); print('\n')
+    print('\n'); print('Running MC Simulation'); print('\n')
     ydata, sigma = data
     pfits_sim = np.empty((num_its, len(p0)))
     y_its = np.empty((num_its, len(ydata)))
@@ -297,8 +292,16 @@ def runsim_chisq(num_its, p0, data, bounds, plot_dir, show_yplots=False, save_fi
                 dW2_AC = normal(layer_d0[7], derr*layer_d0[7]); dW2_BE = normal(layer_d0[8], derr*layer_d0[8])   # thickness of W2 for legs A and B [um]  
                 dI2_ACDF = normal(layer_d0[9], derr*layer_d0[9])   # thickness of I1 for legs A and G [um]  
                 layer_ds[ii] = dS_ABDE, dS_CF, dS_G, dW1_ABD, dW1_E, dI1_ABC, dI1_DF, dW2_AC, dW2_BE, dI2_ACDF
-            else:
-                print('You need to write some code before you can vary thickness for this size d0.')
+            elif len(layer_d0)==11:
+                dS_ABD0, dS_CF0, dS_E0, dS_G0, dW1_ABD0, dW1_E0, dI1_ABC0, dI_DF0, dW2_AC0, dW2_BE0, dI2_AC0 = layer_d0
+                dSABD_err, dSCF_err, dSE_err, dSG_err, dW1ABD_err,  dW1E_err, dI1ABC_err, dIDF_err, dW2AC_err, dW2BE_err, dI2AC_err= derrs
+
+                dS_ABD = normal(dS_ABD0, dSABD_err); dS_CF = normal(dS_CF0, dSCF_err); dS_E = normal(dS_E0, dSE_err); dS_G = normal(dS_G0, dSG_err)   # thickness of S for leg A, C, and G [um]
+                dW1_ABD = normal(dW1_ABD0, dW1ABD_err); dW1_E = normal(dW1_E0, dW1E_err)   # thickness of W1 for legs A and E [um]  
+                dI1_ABC = normal(dI1_ABC0, dI1ABC_err); dI_DF = normal(dI_DF0, dIDF_err)   # thickness of I1 for legs A and G [um]  
+                dW2_AC = normal(dW2_AC0, dW2AC_err); dW2_BE = normal(dW2_BE0, dW2BE_err)   # thickness of W2 for legs A and B [um]  
+                dI2_AC = normal(dI2_AC0, dI2AC_err)   # thickness of I1 for legs A and C [um]  
+                layer_ds[ii] = dS_ABD, dS_CF, dS_E, dS_G, dW1_ABD, dW1_E, dI1_ABC, dI_DF, dW2_AC, dW2_BE, dI2_AC        
         else:
             layer_ds[ii] = layer_d0 
         
@@ -307,7 +310,7 @@ def runsim_chisq(num_its, p0, data, bounds, plot_dir, show_yplots=False, save_fi
 
         Gwires[ii] = Gfrommodel(pfits_sim[ii], 0.420, 7, 220, layer='wiring', fab='bolotest', layer_ds=layer_ds[ii])/4   # function outputs G for four legs worth of microstrip
         # Gfrommodel(fit, dsub, lw, ll, layer='wiring')
-    if show_yplots:
+    if show_simGdata:
         for yy, yit in enumerate(y_its.T):   # check simulated ydata is a normal dist'n
             # plt.figure()
             n, bins, patches = plt.hist(yit, bins=20, label='Simulated Data')
@@ -509,16 +512,16 @@ def bolotest_AoL(L=220, layer_ds=np.array([0.420, 0.400, 0.340, 0.160, 0.100, 0.
     if len(layer_ds)==10:   # original number of unique film thicknesses
         dS_ABDE, dS_CF, dS_G, dW1_ABD, dW1_E, dI1_ABC, dI1_DF, dW2_AC, dW2_BE, dI2_ACDF = layer_ds
         dW2_B = dW2_BE; dI2_AC = dI2_ACDF; dS_ABD = dS_ABDE; dS_E = dS_ABDE   # handle renaming 
-        dW_E = dW1_E+dW2_B; dI_DF = dI1_DF +dI2_ACDF   # handle combining W and I stacks
+        dW1_E = dW1_E+dW2_B; dI_DF = dI1_DF +dI2_ACDF   # handle combining W and I stacks
     elif len(layer_ds)==11:   # added one more layer thickness after FIB measurements Feb 2024
-        dS_ABD, dS_CF, dS_E, dS_G, dW1_ABD, dW_E, dI1_ABC, dI_DF, dW2_AC, dW2_B, dI2_AC = layer_ds
+        dS_ABD, dS_CF, dS_E, dS_G, dW1_ABD, dW1_E, dI1_ABC, dI_DF, dW2_AC, dW2_B, dI2_AC = layer_ds
 
     # wstack_width = (5*dW1_E+3*dW2_BE)/(dW1_E+dW2_BE)   # um, effective width of W1 W2 stack on bolo 20
     A_legA = dS_ABD*7 + dW1_ABD*5      + dI1_ABC*7             + dW2_AC*3   + dI2_AC*7     # S-W1-I1-W2-I2
     A_legB = dS_ABD*7 + dW1_ABD*5      + dI1_ABC*3             + dW2_B*3    + 0            # S-W1-I1-W2, I1 width is actually = W2 width here from FIB measurements
     A_legC = dS_CF*7  + 0              + dI1_ABC*7             + dW2_AC*3   + dI2_AC*7     # S-I1-W2-I2
     A_legD = dS_ABD*7 + dW1_ABD*5      + dI_DF*7               + 0          + 0            # S-W1-I1-I2 (I stack)
-    A_legE = dS_E*7   + (dW_E)*3       + 0                     + 0          + 0            # S-W1-W2 (W stack)
+    A_legE = dS_E*7   + (dW1_E)*3       + 0                     + 0          + 0            # S-W1-W2 (W stack)
     A_legF = dS_CF*7  + 0              + dI_DF*7               + 0          + 0            # S-I1-I2 (I stack)
     A_legG = dS_G*7   + 0              + 0                     + 0          + 0            # bare S 
 
