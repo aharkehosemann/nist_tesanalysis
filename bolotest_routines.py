@@ -171,7 +171,7 @@ def Gfrommodel(fit, dsub, lw, ll, layer='total', fab='legacy', model='three-laye
         # w1w = 2; w2w = 4   # um
         w1w = 3; w2w = 5   # um, why was this previously set to 2 and 4 um ?????
     else: print('Invalid fab type, choose "legacy" or "bolotest."')
-    
+    # pdb.set_trace()
     GU = (G_layer(fit, dsub, layer='U', model=model)) * lw/7 * (220/ll)**Lscale   # G prediction and error on substrate layer for one leg
     GW1 = G_layer(fit, dW1, layer='W', model=model) * w1w/5 * (220/ll)**Lscale  # G prediction and error from 200 nm Nb layer one leg
     GW = (G_layer(fit, dW1, layer='W', model=model) * w1w/5 + G_layer(fit, dW2, layer='W', model=model) * w2w/5) * (220/ll)**Lscale  # G prediction and error from Nb layers for one leg
@@ -487,7 +487,6 @@ def qualityplots(data, sim_dict, plot_dir='./', save_figs=False, fn_comments='',
         elif model=='two-layer':
             GmeasU, GmeasW, alphaU, alphaW = fit_params; sigGU, sigGW, sigalphaU, sigalphaW = fit_errs
         print ('\n\n' + model + ' Model Fit taking '+ calc +' values:')
-        # print('G_U(420 nm) = ', round(GmeasU, 2), ' +/- ', round(sigGU, 2), 'pW/K')
         print('G_U(400 nm) = ', round(GmeasU, 2), ' +/- ', round(sigGU, 2), 'pW/K')
         print('G_W(400 nm) = ', round(GmeasW, 2), ' +/- ', round(sigGW, 2), 'pW/K')
         if model=='three-layer':
@@ -630,13 +629,13 @@ def plot_modelvdata(sim_data, data, title='', vlength_data=np.array([]), plot_bo
 
     # calculate predictions and error bars either with fit parameters or std of predictions from all simulated fit parameters
     if pred_wfit:   # use error bars on fit parameters to calculate error bars on predicted values
-        Gpred, sigmaGpred = Gbolotest(fit, layer_ds=layer_ds)   # predictions and error from model [pW/K]
-        Gpred_wire, sigmaGpred_wire = Gbolotest(fit, layer='wiring', layer_ds=layer_ds)   # predictions and error from model [pW/K]
-        Gpred_U, sigmaGpred_U = Gbolotest(fit, layer='U', layer_ds=layer_ds)   # predictions and error from model [pW/K]
+        Gpred, sigmaGpred = Gbolotest(fit, layer_ds=layer_ds, model=model)   # predictions and error from model [pW/K]
+        Gpred_wire, sigmaGpred_wire = Gbolotest(fit, layer='wiring', layer_ds=layer_ds, model=model)   # predictions and error from model [pW/K]
+        Gpred_U, sigmaGpred_U = Gbolotest(fit, layer='U', layer_ds=layer_ds, model=model)   # predictions and error from model [pW/K]
     else:   # calculate G predictions from each simulated fit, then take mean and std
-        Gpreds = Gbolotest(sim_data, layer_ds=layer_ds)   # predictions from each set of fit parameters [pW/K]
-        GpredWs = Gbolotest(sim_data, layer_ds=layer_ds, layer='wiring')
-        GpredUs = Gbolotest(sim_data, layer_ds=layer_ds, layer='U')
+        Gpreds = Gbolotest(sim_data, layer_ds=layer_ds, model=model)   # predictions from each set of fit parameters [pW/K]
+        GpredWs = Gbolotest(sim_data, layer_ds=layer_ds, layer='wiring', model=model)
+        GpredUs = Gbolotest(sim_data, layer_ds=layer_ds, layer='U', model=model)
 
         if calc=='Mean':
             Gpred = np.mean(Gpreds, axis=0); sigmaGpred = np.std(Gpreds, axis=0)   # predictions and error [pW/K]
@@ -651,19 +650,18 @@ def plot_modelvdata(sim_data, data, title='', vlength_data=np.array([]), plot_bo
         ydatavl_all, sigmavl_all, llvl_all = vlength_data   # send leg lengths in um
         ll_vl = np.array(llvl_all[0:6])  # um
         # AoL_vL = A_bolo[0]/ll_vl   # um, all share the area of bolo 1b
-        AoL_bolotest = bolotest_AoL(layer_ds = layer_ds) # um^2, cross-sectional area for all bolotest geometries
+        AoL_bolotest = bolotest_AoL(layer_ds=layer_ds) # um^2, cross-sectional area for all bolotest geometries
         AoL_vL = AoL_bolotest[0]/ll_vl # um, all share the area of bolo 1b
-        # dsub = 0.420; lw = 7   # um
         dsub = layer_ds[0]; lw = 7   # um
 
         if pred_wfit:
-            Gpred_vl, sigmaGpred_vl = Gfrommodel(fit, dsub, lw, ll_vl, layer='total', fab='bolotest', Lscale=Lscale)
-            Gpredwire_vl, sigmaGpredwire_vl = Gfrommodel(fit, dsub, lw, ll_vl, layer='wiring', fab='bolotest', Lscale=Lscale)
-            GpredU_vl, sigmaGpredU_vl = Gfrommodel(fit, dsub, lw, ll_vl, layer='U', fab='bolotest', Lscale=Lscale)
+            Gpred_vl, sigmaGpred_vl = Gfrommodel(fit, dsub, lw, ll_vl, layer='total', fab='bolotest', Lscale=Lscale, model=model)
+            Gpredwire_vl, sigmaGpredwire_vl = Gfrommodel(fit, dsub, lw, ll_vl, layer='wiring', fab='bolotest', Lscale=Lscale, model=model)
+            GpredU_vl, sigmaGpredU_vl = Gfrommodel(fit, dsub, lw, ll_vl, layer='U', fab='bolotest', Lscale=Lscale, model=model)
         else:
-            Gpred_vls = Gfrommodel(sim_data, dsub, lw, ll_vl, layer='total', fab='bolotest', Lscale=Lscale)
-            Gpredwire_vls = Gfrommodel(sim_data, dsub, lw, ll_vl, layer='wiring', fab='bolotest', Lscale=Lscale)
-            GpredU_vls = Gfrommodel(sim_data, dsub, lw, ll_vl, layer='U', fab='bolotest', Lscale=Lscale)
+            Gpred_vls = Gfrommodel(sim_data, dsub, lw, ll_vl, layer='total', fab='bolotest', Lscale=Lscale, model=model)
+            Gpredwire_vls = Gfrommodel(sim_data, dsub, lw, ll_vl, layer='wiring', fab='bolotest', Lscale=Lscale, model=model)
+            GpredU_vls = Gfrommodel(sim_data, dsub, lw, ll_vl, layer='U', fab='bolotest', Lscale=Lscale, model=model)
 
             if calc=='Mean':
                 Gpred_vl = np.mean(Gpred_vls, axis=0); sigmaGpred_vl = np.std(Gpred_vls, axis=0)   # predictions and error [pW/K]
@@ -772,7 +770,7 @@ def plot_Glegacy(data1b=[], save_figs=False, title='', plot_comments='', Lscale=
 
 
 def predict_Glegacy(sim_data, data1b=[], save_figs=False, title='', calc='Mean', plot_comments='', fs=(8,6), Lscale=1, pred_wfit=True, 
-            lAoLscale=None, layer_ds = np.array([0.372, 0.312, 0.199, 0.181, 0.162, 0.418, 0.298, 0.596, 0.354, 0.314, 0.302]), plot_dir='/Users/angi/NIS/Bolotest_Analysis/plots/layer_extraction_analysis/'):
+            lAoLscale=None, model='three-layer', layer_ds = np.array([0.372, 0.312, 0.199, 0.181, 0.162, 0.418, 0.298, 0.596, 0.354, 0.314, 0.302]), plot_dir='/Users/angi/NIS/Bolotest_Analysis/plots/layer_extraction_analysis/'):
     # predicts G for legacy TES data using alpha model, then plots prediction vs measurements (scaled to 170 mK)
     # legacy geometry and measurements are from Shannon's spreadsheet, then plots 
 
@@ -807,17 +805,17 @@ def predict_Glegacy(sim_data, data1b=[], save_figs=False, title='', calc='Mean',
 
     # calculate predictions and error bars either with fit parameters or std of predictions from all simulated fit parameters
     if pred_wfit:   # use error bars on fit parameters to calculate error bars on predicted values
-        Gpred, sigma_Gpred = Gfrommodel(fit, dsub, lw, ll, Lscale=Lscale)   # predictions and error from model [pW/K]
-        GpredW, sigma_GpredW = Gfrommodel(fit, dsub, lw, ll, layer='wiring', Lscale=Lscale)
-        GpredU, sigma_GpredU = Gfrommodel(fit, dsub, lw, ll, layer='U', Lscale=Lscale)
-        Gpred1b_U, sigma_G1bU = Gfrommodel(fit, layer_ds[0], 7, 220, layer='U', fab='bolotest')  # bolo 1b predictions
-        Gpred1b_wire, sigma_G1bwire = Gfrommodel(fit, layer_ds[0], 7, 220, layer='wiring', fab='bolotest')   # bolo 1b predictions
+        Gpred, sigma_Gpred = Gfrommodel(fit, dsub, lw, ll, Lscale=Lscale, model=model)   # predictions and error from model [pW/K]
+        GpredW, sigma_GpredW = Gfrommodel(fit, dsub, lw, ll, layer='wiring', Lscale=Lscale, model=model)
+        GpredU, sigma_GpredU = Gfrommodel(fit, dsub, lw, ll, layer='U', Lscale=Lscale, model=model)
+        Gpred1b_U, sigma_G1bU = Gfrommodel(fit, layer_ds[0], 7, 220, layer='U', fab='bolotest', model=model)  # bolo 1b predictions
+        Gpred1b_wire, sigma_G1bwire = Gfrommodel(fit, layer_ds[0], 7, 220, layer='wiring', fab='bolotest', model=model)   # bolo 1b predictions
     else:   # calculate G predictions from each simulated fit, then take mean and std
-        Gpreds = Gfrommodel(sim_data, dsub, lw, ll, Lscale=Lscale)   # predictions from each set of fit parameters [pW/K]
-        GpredWs = Gfrommodel(sim_data, dsub, lw, ll, layer='wiring', Lscale=Lscale)
-        GpredUs = Gfrommodel(sim_data, dsub, lw, ll, layer='U', Lscale=Lscale)
-        Gpred1b_Us = Gfrommodel(sim_data, layer_ds[0], 7, 220, layer='U', fab='bolotest')
-        Gpred1b_wires = Gfrommodel(sim_data, layer_ds[0], 7, 220, layer='wiring', fab='bolotest')
+        Gpreds = Gfrommodel(sim_data, dsub, lw, ll, Lscale=Lscale, model=model)   # predictions from each set of fit parameters [pW/K]
+        GpredWs = Gfrommodel(sim_data, dsub, lw, ll, layer='wiring', Lscale=Lscale, model=model)
+        GpredUs = Gfrommodel(sim_data, dsub, lw, ll, layer='U', Lscale=Lscale, model=model)
+        Gpred1b_Us = Gfrommodel(sim_data, layer_ds[0], 7, 220, layer='U', fab='bolotest', model=model)
+        Gpred1b_wires = Gfrommodel(sim_data, layer_ds[0], 7, 220, layer='wiring', fab='bolotest', model=model)
 
         Gpred = np.mean(Gpreds, axis=0); sigma_Gpred = np.std(Gpreds, axis=0)   # predictions and error [pW/K]
         GpredW = np.mean(GpredWs, axis=0)   # predictions and error of W layers [pW/K]
@@ -825,7 +823,7 @@ def predict_Glegacy(sim_data, data1b=[], save_figs=False, title='', calc='Mean',
         Gpred1b_U = np.mean(Gpred1b_Us); sigma_G1bU = np.std(Gpred1b_Us)   # predictions and error [pW/K]
         Gpred1b_wire = np.mean(Gpred1b_wires); sigma_G1bwire = np.std(Gpred1b_wires)   # predictions and error [pW/K]
 
-    normres = (legacy_Gs - Gpred)/legacy_Gs   # normalized residuals [frac of data]
+    normres = (legacy_Gs - Gpred)/sigma_Gpred   # normalized residuals [frac of data]
     resylim = -6 if 'a01' in plot_comments else -2   # different lower limits on residuals depending on model
 
     plt.figure(figsize=fs)
@@ -858,15 +856,16 @@ def predict_Glegacy(sim_data, data1b=[], save_figs=False, title='', calc='Mean',
     handles, labels = ax1.get_legend_handles_labels()
     plt.legend([handles[idx] for idx in lorder],[labels[idx] for idx in lorder], loc=4)   # 2 is upper left, 4 is lower right
 
+
     ax2 = plt.subplot(gs[1], sharex=ax1)   # residuals
     plt.axhline(0, color='k', alpha=0.7)
     plt.scatter(legacy_AoLs, normres, color='g', s=40, alpha=0.8)
-    if len(data1b)==2: plt.scatter(AoL_bolo[0], (data1b[0]-Gpred1b_wire-Gpred1b_U)/data1b[0], color='purple')
+    if len(data1b)==2: plt.scatter(AoL_bolo[0], (data1b[0]-Gpred1b_wire-Gpred1b_U)/np.sqrt(sigma_G1bU**2 + sigma_G1bwire**2), color='purple')
     plt.ylabel("\\textbf{Norm. Res.}")
     plt.xlabel('Leg A/L [$\mu$m]')
-    plt.ylim(resylim,1)
+    # plt.ylim(resylim,1)
     plt.tick_params(axis="y", which="both", right=True)
-    plt.gca().yaxis.set_ticks([-2, -1, 0, 1])
+    # plt.gca().yaxis.set_ticks([-2, -1, 0, 1])
     plt.subplots_adjust(hspace=0.075)   # merge to share one x axis
     if save_figs: plt.savefig(plot_dir + 'Gpred' + plot_comments + '.png', dpi=300) 
 
