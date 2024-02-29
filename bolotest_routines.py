@@ -119,15 +119,15 @@ def G_layer(fit, d, layer='U', model='three-layer'):
         d = np.array(d)
 
     if model=='three-layer':   # treat substrate and insulating nitride as separate layers
-        # if layer=='U': linds=np.array([0,3]); d0=.420   # substrate layer parameter indexes and default thickness in um
         if layer=='U': linds=np.array([0,3]); d0=.400   # substrate layer parameter indexes and default thickness in um
         elif layer=='W': linds=np.array([1,4]); d0=.400   # Nb layer parameter indexes and default thickness in um
         elif layer=='I': linds=np.array([2,5]); d0=.400   # insulating layer parameter indexes and default thickness in um
     elif model=='two-layer':   # treat substrate and insulating nitride as the same layer
-        if layer=='U': linds=np.array([0,2]); d0=.400   # substrate layer parameter indexes and default thickness in um
+        if layer=='U': linds=np.array([0,2]); d0=.400   # nitride layer parameter indexes and default thickness in um
         elif layer=='W': linds=np.array([1,3]); d0=.400   # Nb layer parameter indexes and default thickness in um
-        elif layer=='I': linds=np.array([0,2]); d0=.400   # insulating layer parameter indexes and default thickness in um
+        elif layer=='I': print('Only considering U and W layers in two-layer model.')   # insulating layer parameter indexes and default thickness in um
 
+    # pdb.set_trace()
     numrows = fit.shape[0]   # num of rows determines type of fit passed
     if numrows==1 or len(fit.shape)==1:   # user passed one set of fit parameters with no error bars
         G0, alpha = fit[linds]
@@ -152,8 +152,7 @@ def G_layer(fit, d, layer='U', model='three-layer'):
     return Glayer
     
 
-# def Gfrommodel(fit, dsub, lw, ll, layer='total', fab='legacy', Lscale=1.0, layer_ds=np.array([0.420, 0.400, 0.340, 0.160, 0.100, 0.350, 0.270, 0.340, 0.285, 0.400])):   # model params, thickness of substrate, leg width, and leg length in um
-def Gfrommodel(fit, dsub, lw, ll, layer='total', fab='legacy', Lscale=1.0, layer_ds = np.array([0.372, 0.312, 0.199, 0.181, 0.162, 0.418, 0.298, 0.596, 0.354, 0.314, 0.302])):   # model params, thickness of substrate, leg width, and leg length in um
+def Gfrommodel(fit, dsub, lw, ll, layer='total', fab='legacy', model='three-layer', Lscale=1.0, layer_ds = np.array([0.372, 0.312, 0.199, 0.181, 0.162, 0.418, 0.298, 0.596, 0.354, 0.314, 0.302])):   # model params, thickness of substrate, leg width, and leg length in um
     # predicts G_TES and error from our model and arbitrary bolo geometry, assumes microstrip on all four legs a la bolo 1b
     # thickness of wiring layers is independent of geometry
     # RETURNS [G prediction, prediction error]
@@ -171,13 +170,15 @@ def Gfrommodel(fit, dsub, lw, ll, layer='total', fab='legacy', Lscale=1.0, layer
             dW1 = dW1_ABD*arrayconv; dI1 = dI1_ABC*arrayconv; dW2 = dW2_AC*arrayconv; dI2 = dI2_AC*arrayconv   # film thicknesses for microstrip, um
         # w1w = 2; w2w = 4   # um
         w1w = 3; w2w = 5   # um, why was this previously set to 2 and 4 um ?????
-        # pdb.set_trace()
     else: print('Invalid fab type, choose "legacy" or "bolotest."')
     
-    GU = (G_layer(fit, dsub, layer='U')) * lw/7 * (220/ll)**Lscale   # G prediction and error on substrate layer for one leg
-    GW1 = G_layer(fit, dW1, layer='W') * w1w/5 * (220/ll)**Lscale  # G prediction and error from 200 nm Nb layer one leg
-    GW = (G_layer(fit, dW1, layer='W') * w1w/5 + G_layer(fit, dW2, layer='W') * w2w/5) * (220/ll)**Lscale  # G prediction and error from Nb layers for one leg
-    GI = (G_layer(fit, dI1, layer='I') + G_layer(fit, dI2, layer='I')) * lw/7 * (220/ll)**Lscale   # G prediction and error on insulating layers for one leg
+    GU = (G_layer(fit, dsub, layer='U', model=model)) * lw/7 * (220/ll)**Lscale   # G prediction and error on substrate layer for one leg
+    GW1 = G_layer(fit, dW1, layer='W', model=model) * w1w/5 * (220/ll)**Lscale  # G prediction and error from 200 nm Nb layer one leg
+    GW = (G_layer(fit, dW1, layer='W', model=model) * w1w/5 + G_layer(fit, dW2, layer='W', model=model) * w2w/5) * (220/ll)**Lscale  # G prediction and error from Nb layers for one leg
+    if model=='three-layer':
+        GI = (G_layer(fit, dI1, layer='I', model=model) + G_layer(fit, dI2, layer='I', model=model)) * lw/7 * (220/ll)**Lscale   # G prediction and error on insulating layers for one leg
+    if model=='two-layer':
+        GI = (G_layer(fit, dI1, layer='U', model=model) + G_layer(fit, dI2, layer='U', model=model)) * lw/7 * (220/ll)**Lscale   # G prediction and error on insulating layers for one leg
     Gwire = GW + GI # G error for microstrip on one leg, summing error works because error is never negative here
 
     if layer=='total': return 4*(GU+Gwire)   # value and error, microstrip + substrate on four legs
@@ -214,27 +215,27 @@ def Gbolotest(fit, layer='total', model='three-layer', layer_ds = np.array([0.37
     if len(layer_ds)==10:   # original number of unique film thicknesses
         dS_ABDE, dS_CF, dS_G, dW1_ABD, dW1_E, dI1_ABC, dI1_DF, dW2_AC, dW2_BE, dI2_ACDF = layer_ds
         dW2_B = dW2_BE; dI2_AC = dI2_ACDF; dS_ABD = dS_ABDE; dS_E = dS_ABDE   # handle renaming 
-        dW1_E = dW1_E+dW2_B; dI_DF = dI1_DF +dI2_ACDF   # handle combining W and I stacks
+        dW_E = dW1_E+dW2_B; dI_DF = dI1_DF +dI2_ACDF   # handle combining W and I stacks
     elif len(layer_ds)==11:   # added one more layer thickness after FIB measurements Feb 2024
-        dS_ABD, dS_CF, dS_E, dS_G, dW1_ABD, dW1_E, dI1_ABC, dI_DF, dW2_AC, dW2_B, dI2_AC = layer_ds
+        dS_ABD, dS_CF, dS_E, dS_G, dW1_ABD, dW_E, dI1_ABC, dI_DF, dW2_AC, dW2_B, dI2_AC = layer_ds
     else:
         print('Unconventional layer_ds length of '+str(len(layer_ds)))
-
+    # pdb.set_trace()
     if model=='three-layer':
-        G_legA = G_layer(fit, dS_ABD, layer='U', model=model)*include_U + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W + G_layer(fit, dI1_ABC, layer='I', model=model)*include_I + G_layer(fit, dW2_AC, layer='W', model=model)*3/5*include_W + G_layer(fit, dI2_AC, layer='I', model=model)*include_I # S-W1-I1-W2-I2
-        G_legB = G_layer(fit, dS_ABD, layer='U', model=model)*include_U + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W + G_layer(fit, dI1_ABC, layer='I', model=model)*3/7*include_I + G_layer(fit, dW2_B, layer='W', model=model)*3/5*include_W   # S-W1-I1-W2
-        G_legC = G_layer(fit, dS_CF, layer='U', model=model)*include_U + G_layer(fit, dI1_ABC, layer='I', model=model) + G_layer(fit, dW2_AC, layer='W', model=model)*3/5*include_W + G_layer(fit, dI2_AC, layer='I', model=model)*include_I   # S-I1-W2-I2
-        G_legD = G_layer(fit, dS_ABD, layer='U', model=model)*include_U + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W + G_layer(fit, dI_DF, layer='I', model=model)*include_I   # S-W1-I1-I2 (I stack)
-        G_legE = G_layer(fit, dS_E, layer='U', model=model)*include_U + G_layer(fit, dW1_E, layer='W', model=model)*3/5*include_W   # S-W1-W2 (W stack)
-        G_legF = G_layer(fit, dS_CF, layer='U', model=model)*include_U + G_layer(fit, dI_DF, layer='I', model=model)*include_I   # S-I1-I2 (I stack)
+        G_legA = G_layer(fit, dS_ABD, layer='U', model=model)*include_U + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W   + G_layer(fit, dI1_ABC, layer='I', model=model)*include_I     + G_layer(fit, dW2_AC, layer='W', model=model)*3/5*include_W + G_layer(fit, dI2_AC, layer='I', model=model)*include_I   # S-W1-I1-W2-I2
+        G_legB = G_layer(fit, dS_ABD, layer='U', model=model)*include_U + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W   + G_layer(fit, dI1_ABC, layer='I', model=model)*3/7*include_I + G_layer(fit, dW2_B, layer='W', model=model)*3/5*include_W   # S-W1-I1-W2
+        G_legC = G_layer(fit, dS_CF, layer='U', model=model)*include_U  + 0                                                         + G_layer(fit, dI1_ABC, layer='I', model=model)*include_I     + G_layer(fit, dW2_AC, layer='W', model=model)*3/5*include_W + G_layer(fit, dI2_AC, layer='I', model=model)*include_I   # S-I1-W2-I2
+        G_legD = G_layer(fit, dS_ABD, layer='U', model=model)*include_U + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W   + G_layer(fit, dI_DF, layer='I', model=model)*include_I   # S-W1-I1-I2 (I stack)
+        G_legE = G_layer(fit, dS_E, layer='U', model=model)*include_U   + G_layer(fit, dW_E, layer='W', model=model)*3/5*include_W   # S-W1-W2 (W stack)
+        G_legF = G_layer(fit, dS_CF, layer='U', model=model)*include_U  + 0                                                         + G_layer(fit, dI_DF, layer='I', model=model)*include_I   # S-I1-I2 (I stack)
         G_legG = G_layer(fit, dS_G, layer='U', model=model)*include_U   # bare S 
     elif model=='two-layer':   # treat all nitride layers as the same layer, relevant on legs C and F
-        G_legA = G_layer(fit, dS_ABD, layer='U', model=model)*include_U + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W + G_layer(fit, dI1_ABC, layer='I', model=model)*include_I + G_layer(fit, dW2_AC, layer='W', model=model)*3/5*include_W + G_layer(fit, dI2_AC, layer='I', model=model)*include_I # S-W1-I1-W2-I2
-        G_legB = G_layer(fit, dS_ABD, layer='U', model=model)*include_U + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W + G_layer(fit, dI1_ABC, layer='I', model=model)*3/7*include_I + G_layer(fit, dW2_B, layer='W', model=model)*3/5*include_W   # S-W1-I1-W2
-        G_legC = G_layer(fit, dS_CF, layer='U', model=model)*include_U + G_layer(fit, dI1_ABC, layer='I', model=model) + G_layer(fit, dW2_AC, layer='W', model=model)*3/5*include_W + G_layer(fit, dI2_AC, layer='I', model=model)*include_I   # S-I1-W2-I2
-        G_legD = G_layer(fit, dS_ABD, layer='U', model=model)*include_U + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W + G_layer(fit, dI_DF, layer='I', model=model)*include_I   # S-W1-I1-I2 (I stack)
-        G_legE = G_layer(fit, dS_E, layer='U', model=model)*include_U + G_layer(fit, dW1_E, layer='W', model=model)*3/5*include_W   # S-W1-W2 (W stack)
-        G_legF = G_layer(fit, dS_CF, layer='U', model=model)*include_U + G_layer(fit, dI_DF, layer='I', model=model)*include_I   # S-I1-I2 (I stack)
+        G_legA = G_layer(fit, dS_ABD, layer='U', model=model)*include_U + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W   + G_layer(fit, dI1_ABC, layer='U', model=model)*include_I     + G_layer(fit, dW2_AC, layer='W', model=model)*3/5*include_W + G_layer(fit, dI2_AC, layer='U', model=model)*include_I   # S-W1-I1-W2-I2
+        G_legB = G_layer(fit, dS_ABD, layer='U', model=model)*include_U + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W   + G_layer(fit, dI1_ABC, layer='U', model=model)*3/7*include_I + G_layer(fit, dW2_B, layer='W', model=model)*3/5*include_W   # S-W1-I1-W2
+        G_legC = G_layer(fit, dS_CF+dI1_ABC, layer='U', model=model)*include_U*include_I  + 0                                       + 0                                                           + G_layer(fit, dW2_AC, layer='W', model=model)*3/5*include_W + G_layer(fit, dI2_AC, layer='U', model=model)*include_I   # S-I1-W2-I2, S-I1 is one layer
+        G_legD = G_layer(fit, dS_ABD, layer='U', model=model)*include_U + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W   + G_layer(fit, dI_DF, layer='U', model=model)*include_I   # S-W1-I1-I2 (I stack is one layer)
+        G_legE = G_layer(fit, dS_E, layer='U', model=model)*include_U   + G_layer(fit, dW_E, layer='W', model=model)*3/5*include_W   # S-W1-W2 (W stack)
+        G_legF = G_layer(fit, dS_CF+dI_DF, layer='U', model=model)*include_U*include_I   # S-I1-I2 (S-I1-I2 stack is one layer)
         G_legG = G_layer(fit, dS_G, layer='U', model=model)*include_U   # bare S 
 
     G_1b = 4*G_legA
@@ -243,7 +244,7 @@ def Gbolotest(fit, layer='total', model='three-layer', layer_ds = np.array([0.37
     G_22 = 3*G_legA + 1*G_legG
     G_21 = 1*G_legB + 3*G_legF
     G_20 = 1*G_legB + 3*G_legE
-    G_7 = 2*G_legA + 1*G_legC + 1*G_legD
+    G_7  = 2*G_legA + 1*G_legC + 1*G_legD
     G_13 = 1*G_legB + 3*G_legG
 
     # if len(fit.shape)==2:   # return values and errors
@@ -265,19 +266,19 @@ def chisq_val(params, args, model='three-layer', layer_ds = np.array([0.372, 0.3
         ydata, sigma, layer_ds = args
     elif len(args)==2:
         ydata, sigma = args
-    
+    # pdb.set_trace()
     Gbolos_model = Gbolotest(params, layer_ds=layer_ds, model=model)   # predicted G of each bolo
     chisq_vals = (Gbolos_model-ydata)**2/sigma**2
     
     return np.sum(chisq_vals)
 
 
-def calc_func_grid(params, data, layer_ds = np.array([0.372, 0.312, 0.199, 0.181, 0.162, 0.418, 0.298, 0.596, 0.354, 0.314, 0.302])):   # chi-squared parameter space
+def calc_func_grid(params, data, layer_ds = np.array([0.372, 0.312, 0.199, 0.181, 0.162, 0.418, 0.298, 0.596, 0.354, 0.314, 0.302]), model='three-layer'):   # chi-squared parameter space
     func_grid = np.full((len(params), len(params)), np.nan)
     for rr, row in enumerate(params): 
         for cc, col in enumerate(row):
             params_rc = col            
-            func_grid[rr, cc] = chisq_val(params_rc, data, layer_ds=layer_ds)
+            func_grid[rr, cc] = chisq_val(params_rc, data, layer_ds=layer_ds, model=model)
     return func_grid
 
 def runsim_chisq(num_its, p0, data, bounds, plot_dir, show_simGdata=False, save_figs=False, fn_comments='', save_sim=False, sim_file=None, calc='Mean',
@@ -316,10 +317,12 @@ def runsim_chisq(num_its, p0, data, bounds, plot_dir, show_simGdata=False, save_
                 layer_ds[ii] = dS_ABD, dS_CF, dS_E, dS_G, dW1_ABD, dW1_E, dI1_ABC, dI_DF, dW2_AC, dW2_BE, dI2_AC        
         else:
             layer_ds[ii] = layer_d0 
+        # pdb.set_trace()
         
         it_result = minimize(chisq_val, p0, args=[y_its[ii], sigma, layer_ds[ii], model], bounds=bounds)   # minimize chi-squared function with this iteration's G_TES values and film thicknesses
         pfits_sim[ii] = it_result['x']
-        Gwires[ii] = Gfrommodel(pfits_sim[ii], layer_ds[0], 7, 220, layer='wiring', fab='bolotest', layer_ds=layer_ds[ii])/4   # function outputs G for four legs worth of microstrip
+        Gwires[ii] = Gfrommodel(pfits_sim[ii], layer_ds[0], 7, 220, layer='wiring', fab='bolotest', layer_ds=layer_ds[ii], model=model)/4   # function outputs G for four legs worth of microstrip
+        # pdb.set_trace()
 
     if show_simGdata:
         for yy, yit in enumerate(y_its.T):   # check simulated ydata is a normal dist'n
@@ -330,34 +333,43 @@ def runsim_chisq(num_its, p0, data, bounds, plot_dir, show_simGdata=False, save_
             plt.title(bolos[yy])
             plt.annotate(r'N$_{iterations}$ = %d'%num_its, (min(yit), 0.9*max(n)))
             if save_figs: plt.savefig(plot_dir + bolos[yy] + '_simydata' + fn_comments + '.png', dpi=300) 
-        
+    # pdb.set_trace()
+
     # sort & print results 
     if calc=='Mean':
         sim_params = np.mean(pfits_sim, axis=0)
     elif calc=='Median':
         sim_params = np.median(pfits_sim, axis=0)
     sim_std = np.std(pfits_sim, axis=0)
-    U_sim, W_sim, I_sim, aU_sim, aW_sim, aI_sim = sim_params   # parameter fits from Monte Carlo Function Minimization
-    Uerr_sim, Werr_sim, Ierr_sim, aUerr_sim, aWerr_sim, aIerr_sim = sim_std   # parameter errors from Monte Carlo Function Minimization
+    if model=='three-layer':   # 6 fit parameters
+        U_sim, W_sim, I_sim, aU_sim, aW_sim, aI_sim = sim_params   # parameter fits from Monte Carlo 
+        Uerr_sim, Werr_sim, Ierr_sim, aUerr_sim, aWerr_sim, aIerr_sim = sim_std   # parameter errors from Monte Carlo
+    elif model=='two-layer':   # 4 fit parameters
+        U_sim, W_sim, aU_sim, aW_sim = sim_params   # parameter fits from Monte Carlo 
+        Uerr_sim, Werr_sim, aUerr_sim, aWerr_sim = sim_std   # parameter errors from Monte Carlo 
     Gwire = np.mean(Gwires); Gwire_std = np.std(Gwires)
-    chisq_sim = chisq_val(sim_params, data, layer_ds=layer_d0, model=model)
+    chisq_fit = chisq_val(sim_params, data, layer_ds=layer_d0, model=model)
 
-    print('Results from Monte Carlo Sim - '+calc)
-    # print('G_U(420 nm) = ', round(U_sim, 2), ' +/- ', round(Uerr_sim, 2), 'pW/K')
+    print ('\n\n' + model + ' Model Fit taking '+ calc +' values:')
     print('G_U(400 nm) = ', round(U_sim, 2), ' +/- ', round(Uerr_sim, 2), 'pW/K')
     print('G_W(400 nm) = ', round(W_sim, 2), ' +/- ', round(Werr_sim, 2), 'pW/K')
-    print('G_I(400 nm) = ', round(I_sim, 2), ' +/- ', round(Ierr_sim, 2), 'pW/K')
+    if model=='three-layer':
+        print('G_I(400 nm) = ', round(I_sim, 2), ' +/- ', round(Ierr_sim, 2), 'pW/K')
     print('alpha_U = ', round(aU_sim, 2), ' +/- ', round(aUerr_sim, 2))
     print('alpha_W = ', round(aW_sim, 2), ' +/- ', round(aWerr_sim, 2))
-    print('alpha_I = ', round(aI_sim, 2), ' +/- ', round(aIerr_sim, 2))
+    if model=='three-layer':
+        print('alpha_I = ', round(aI_sim, 2), ' +/- ', round(aIerr_sim, 2))
     print('G_microstrip = ', round(Gwire, 2), ' +/- ', round(Gwire_std, 2), 'pW/K')
-    print('Chi-squared value: ', round(chisq_sim, 3)) 
-    print('')
+    print('Chi-squared value: ', round(chisq_fit, 3)) 
+    print('\n\n')
 
     if save_sim:
         sim_dict = {}
         sim_dict['sim'] = pfits_sim   # add simulation 
         sim_dict['Gwires'] = Gwires   
+        sim_dict['model'] = model   
+        sim_dict['calc'] = calc   
+        sim_dict['num_its'] = num_its   
         sim_dict['sim_params'] = {}
         sim_dict['sim_params']['num_its'] = num_its   
         sim_dict['sim_params']['p0'] = p0  
@@ -368,6 +380,7 @@ def runsim_chisq(num_its, p0, data, bounds, plot_dir, show_simGdata=False, save_
         sim_dict['fit']['sigma_Gwire'] = Gwire_std  
         sim_dict['fit']['Gwire'] = Gwire   # pW/K
         sim_dict['fit']['Gwire_std'] = Gwire_std   # pW/K
+        sim_dict['fit']['chi-sq'] = chisq_fit   
         print('Saving simulation to ', sim_file); print('\n')
         with open(sim_file, 'wb') as outfile:   # save simulation pkl
             pkl.dump(sim_dict, outfile)
@@ -383,7 +396,13 @@ def qualityplots(data, sim_dict, plot_dir='./', save_figs=False, fn_comments='',
     # params can be either the mean or median of the simulation values
     # spinds are indexes of a certain subpopulation to plot. if the length of this is 0, it will analyze the entire population. 
 
-    layers = np.array(['U', 'W', 'I'])
+    if model=='three-layer':
+        layers = np.array(['U', 'W', 'I'])
+        num_sp = 3   # three subplots
+    elif model=='two-layer':
+        layers = np.array(['U', 'W'])
+        num_sp = 2   # two subplots
+
     A_U = 7*0.400; A_W = 5*0.400; A_I = 7*0.400   # um^2, for converting G(d0) to kappa
     # A_U = 7*0.420; A_W = 5*0.400; A_I = 7*0.400   # um^2, for converting G(d0) to kappa
     L = 220   # um
@@ -407,8 +426,8 @@ def qualityplots(data, sim_dict, plot_dir='./', save_figs=False, fn_comments='',
         fit_params = sim_dict
         fit_errs = np.array([0,0,0,0,0,0])
         # Gwire = Gfrommodel(fit_params, 0.420, 7, 220, layer='wiring', fab='bolotest')/4; sigma_Gwire=0
-        Gwire = Gfrommodel(fit_params, layer_ds[0], 7, 220, layer='wiring', fab='bolotest')/4; sigma_Gwire=0
-        
+        Gwire = Gfrommodel(fit_params, layer_ds[0], 7, 220, layer='wiring', fab='bolotest', model=model)/4; sigma_Gwire=0
+    # pdb.set_trace()
     chisq_fit = chisq_val(fit_params, data, layer_ds=layer_ds, model=model)
 
     if plot:
@@ -423,20 +442,28 @@ def qualityplots(data, sim_dict, plot_dir='./', save_figs=False, fn_comments='',
             xlab = '\\textbf{G}$_\\textbf{'+layer+'}$'
             ylab = '$\\boldsymbol{\\alpha_\\textbf{'+layer+'}}$'
             if layer=='U': 
-                Gind=0; aind=3   # G and alpha indexes in parameters array
-                gridparams = np.array([xgrid, fit_params[1]*np.ones_like(xgrid), fit_params[2]*np.ones_like(xgrid), ygrid, fit_params[4]*np.ones_like(ygrid), fit_params[5]*np.ones_like(ygrid)]).T
+                if model=='three-layer':
+                    Gind=0; aind=3   # G and alpha indexes in parameters array
+                    gridparams = np.array([xgrid, fit_params[1]*np.ones_like(xgrid), fit_params[2]*np.ones_like(xgrid), ygrid, fit_params[4]*np.ones_like(ygrid), fit_params[5]*np.ones_like(ygrid)]).T
+                elif model=='two-layer':
+                    Gind=0; aind=2   # G and alpha indexes in parameters array
+                    gridparams = np.array([xgrid, fit_params[1]*np.ones_like(xgrid), ygrid, fit_params[3]*np.ones_like(ygrid)]).T
                 splot_ID = '\\textbf{i.}'
             elif layer=='W': 
-                Gind=1; aind=4   # G and alpha indexes in parameters array
-                gridparams = np.array([fit_params[0]*np.ones_like(xgrid), xgrid, fit_params[2]*np.ones_like(xgrid), fit_params[3]*np.ones_like(ygrid), ygrid, fit_params[5]*np.ones_like(ygrid)]).T
+                if model=='three-layer':
+                    Gind=1; aind=4   # G and alpha indexes in parameters array
+                    gridparams = np.array([fit_params[0]*np.ones_like(xgrid), xgrid, fit_params[2]*np.ones_like(xgrid), fit_params[3]*np.ones_like(ygrid), ygrid, fit_params[5]*np.ones_like(ygrid)]).T
+                elif model=='two-layer':
+                    Gind=1; aind=3   # G and alpha indexes in parameters array
+                    gridparams = np.array([fit_params[0]*np.ones_like(xgrid), xgrid, fit_params[2]*np.ones_like(ygrid), ygrid]).T
                 splot_ID = '\\textbf{ii.}'
-            elif layer=='I': 
+            elif layer=='I':   # only called in 3 layer model
                 Gind=2; aind=5   # G and alpha indexes in parameters array
                 gridparams = np.array([fit_params[0]*np.ones_like(xgrid), fit_params[1]*np.ones_like(xgrid), xgrid, fit_params[3]*np.ones_like(ygrid), fit_params[4]*np.ones_like(ygrid), ygrid]).T
                 splot_ID = '\\textbf{iii.}'
 
-            funcgrid = calc_func_grid(gridparams, data, layer_ds=layer_ds)   # calculate chisq values for points in the grid
-            ax = fig.add_subplot(1,3,ll+1)   # select subplot
+            funcgrid = calc_func_grid(gridparams, data, layer_ds=layer_ds, model=model)   # calculate chisq values for points in the grid
+            ax = fig.add_subplot(1,num_sp,ll+1)   # select subplot
             im = plt.imshow(funcgrid, cmap=plt.cm.RdBu, vmax=vmax, extent=[min(xgridlim), max(xgridlim), min(ygridlim), max(ygridlim)], origin='lower', alpha=0.6)   # quality plot
             plt.errorbar(fit_params[Gind], fit_params[aind], xerr=fit_errs[Gind], yerr=fit_errs[aind], color='black', label='\\textbf{Model Fit}', capsize=2, linestyle='None')   # fit results
             plt.xlabel(xlab); plt.ylabel(ylab)
@@ -455,27 +482,34 @@ def qualityplots(data, sim_dict, plot_dir='./', save_figs=False, fn_comments='',
 
     if print_results:
         ### print results
-        GmeasU, GmeasW, GmeasI, alphaU, alphaW, alphaI = fit_params; sigGU, sigGW, sigGI, sigalphaU, sigalphaW, sigalphaI = fit_errs
-        print ('\n\nResults taking '+ calc +' values:')
+        if model=='three-layer':
+            GmeasU, GmeasW, GmeasI, alphaU, alphaW, alphaI = fit_params; sigGU, sigGW, sigGI, sigalphaU, sigalphaW, sigalphaI = fit_errs
+        elif model=='two-layer':
+            GmeasU, GmeasW, alphaU, alphaW = fit_params; sigGU, sigGW, sigalphaU, sigalphaW = fit_errs
+        print ('\n\n' + model + ' Model Fit taking '+ calc +' values:')
         # print('G_U(420 nm) = ', round(GmeasU, 2), ' +/- ', round(sigGU, 2), 'pW/K')
         print('G_U(400 nm) = ', round(GmeasU, 2), ' +/- ', round(sigGU, 2), 'pW/K')
         print('G_W(400 nm) = ', round(GmeasW, 2), ' +/- ', round(sigGW, 2), 'pW/K')
-        print('G_I(400 nm) = ', round(GmeasI, 2), ' +/- ', round(sigGI, 2), 'pW/K')
+        if model=='three-layer':
+            print('G_I(400 nm) = ', round(GmeasI, 2), ' +/- ', round(sigGI, 2), 'pW/K')
         print('alpha_U = ', round(alphaU, 2), ' +/- ', round(sigalphaU, 2))
         print('alpha_W = ', round(alphaW, 2), ' +/- ', round(sigalphaW, 2))
-        print('alpha_I = ', round(alphaI, 2), ' +/- ', round(sigalphaI, 2))
+        if model=='three-layer':
+            print('alpha_I = ', round(alphaI, 2), ' +/- ', round(sigalphaI, 2))
         print('')
         kappaU = GtoKappa(GmeasU, A_U, L); sigkappaU = GtoKappa(sigGU, A_U, L)   # pW / K / um; error analysis is correct because kappa(G) just depends on constants
-        kappaW = GtoKappa(GmeasW, A_W, L); sigkappaW = GtoKappa(sigGW, A_W, L)   # pW / K / um
-        kappaI = GtoKappa(GmeasI, A_I, L); sigkappaI = GtoKappa(sigGI, A_I, L)   # pW / K / um
         print('Kappa_U: ', round(kappaU, 2), ' +/- ', round(sigkappaU, 2), ' pW/K/um')
+        kappaW = GtoKappa(GmeasW, A_W, L); sigkappaW = GtoKappa(sigGW, A_W, L)   # pW / K / um
         print('Kappa_W: ', round(kappaW, 2), ' +/- ', round(sigkappaW, 2), ' pW/K/um')
-        print('Kappa_I: ', round(kappaI, 2), ' +/- ', round(sigkappaI, 2), ' pW/K/um')
+        kappas = [kappaU, kappaW]; sigkappas = [sigkappaU, sigkappaW]
+        if model=='three-layer':
+            kappaI = GtoKappa(GmeasI, A_I, L); sigkappaI = GtoKappa(sigGI, A_I, L)   # pW / K / um
+            print('Kappa_I: ', round(kappaI, 2), ' +/- ', round(sigkappaI, 2), ' pW/K/um')
+            kappas = [kappaU, kappaW, kappaI]; sigkappas = [sigkappaU, sigkappaW, sigkappaI]
         print('G_wire = ', round(Gwire, 2), ' +/- ', round(sigma_Gwire, 2), 'pW/K')
-
         print('Chi-squared value: ', round(chisq_fit, 3)) 
 
-    return fit_params, fit_errs, [kappaU, kappaW, kappaI], [sigkappaU, sigkappaW, sigkappaI], Gwire, sigma_Gwire, chisq_fit
+    return fit_params, fit_errs, kappas, sigkappas, Gwire, sigma_Gwire, chisq_fit
 
 def pairwise(sim_data, labels, title='', plot_dir='./', fn_comments='', save_figs=False, indstp=[], indsop=[], oplotlabel='', fs=(10,8)):
     # make pairwise correlation plots with histograms on the diagonal 
