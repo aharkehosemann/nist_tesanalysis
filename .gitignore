@@ -1,0 +1,10 @@
+.DS_Store
+__pycache__/
+__init__.py
+*.pyc
+*_for*.py
+*_old.py
+*.png
+*.pdf
+temp_grad.py*
+testemp_vs_vbias.py
