@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import pickle as pkl
@@ -69,15 +70,6 @@ def KappatoG(kappa, A, L):   # thermal conductance in pW/K/um, area in um^2, len
     return kappa*A/L
 
 # ### Thermal Fluctuation Noise Equivalent Power
-# def FLink(Tb, Tc):
-#     # convert equilibrium NEP to nonequilibrium conditions of TES operation
-#     # Mather 1982
-#     # assumes k(T)~T^beta, and beta=3 (true for superconductors and crystalline dielectrics (so yes Nb no SiNx))
-#     Tgrad = Tb/Tc
-#     return 4/5 * (1-Tgrad**5)/(1-Tgrad**4)
-#     # CV, SiN = 0.082T + 0.502T 3 J/(K m3)
-
-
 def TFNEP(Tc, G, Tb=0.100, gamma=1):   # calculate thermal fluctuation noise equivalent power as a function of G and T_TES
     # return np.sqrt(4*kB*G*FLink(Tb, Tc))*Tc
     return np.sqrt(4*kB*G*gamma)*Tc   # FLink only analytical for Nb
@@ -105,7 +97,6 @@ def G_fromPsat(P, n, Tc, Tb):
     return P*n/Tc / (1 - (Tb/Tc)**n)
 
 ### G from alpha model
-# def wlw(lw, fab='bolotest', layer='wiring'):
 def wlw(lw, fab='bolotest'):
     # calculate W layer widths for bolotest or legacy data
     # INPUT lw in um
@@ -162,11 +153,11 @@ def G_layer(fit, d, layer='S', model='Three-Layer'):
             return np.zeros(len(d))   # handle potential divide by 0 error
 
     if model=='Three-Layer':   # treat substrate and insulating nitride as separate layers
-        if layer=='S': linds=np.array([0,3]); d0=.400   # substrate layer parameter indexes and defaSlt thickness in um
+        if   layer=='S': linds=np.array([0,3]); d0=.400   # substrate layer parameter indexes and defaSlt thickness in um
         elif layer=='W': linds=np.array([1,4]); d0=.400   # Nb layer parameter indexes and defaSlt thickness in um
         elif layer=='I': linds=np.array([2,5]); d0=.400   # insulating layer parameter indexes and defaSlt thickness in um
     elif model=='Two-Layer':   # treat substrate and insulating nitride as the same layer
-        if layer=='S': linds=np.array([0,2]); d0=.400   # nitride layer parameter indexes and defaSlt thickness in um
+        if   layer=='S': linds=np.array([0,2]); d0=.400   # nitride layer parameter indexes and defaSlt thickness in um
         elif layer=='W': linds=np.array([1,3]); d0=.400   # Nb layer parameter indexes and defaSlt thickness in um
         elif layer=='I': print('Only considering S and W layers in two-layer model.')   # insulating layer parameter indexes and defaSlt thickness in um
 
@@ -194,12 +185,9 @@ def G_layer(fit, d, layer='S', model='Three-Layer'):
 
     return Glayer
 
-
-# def ascale(ll, La, d=0.400, d0=0.400, alpha=0., scale_alpha=False):
 def ascale(ll, La):
     return 1/(1+ll/La)
 
-# def acoust_factor(fit, bolo, dS, dW1, dI1, dW2, dI2):
 def acoust_factor(bolo):
     # use acoustic length scaling (and potentially acoustic thickness scaling)
     La = bolo['geometry']['La']
@@ -225,7 +213,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
     supG    = an_opts.get('supG', 0.0)
 
     w1w = bolo['geometry'].get('w1w'); w2w = bolo['geometry'].get('w2w')
-    lw  = bolo['geometry'].get('lw'); ll = bolo['geometry'].get('ll')
+    lw  = bolo['geometry'].get('lw');  ll = bolo['geometry'].get('ll')
 
     # scale with L and d in diffuse / ballistic transition
     if bolo['geometry'].get('acoustic_Lscale'):   # use acoustic scaling
@@ -236,7 +224,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
         # scale_S = scale_W1 = scale_W2 = scale_I1 = scale_I2 = scale_I1I2 = (220/ll)**pLscale
         a_factor = (220/ll)**pLscale
 
-    G_W = (G_layer(fit, dW1, layer='W', model=model) * w1w/5 + G_layer(fit, dW2, layer='W', model=model) * w2w/5 ) * a_factor * include_W
+    G_W = (G_layer(fit, dW1, layer='W', model=model) * (w1w/5)**1.0 + G_layer(fit, dW2, layer='W', model=model) * (w2w/5)**1.0 ) * a_factor * include_W
 
     ### handle nitride layers - separate vs stacked treatment
     if model=='Three-Layer':
@@ -318,7 +306,7 @@ def G_bolotest(fit, an_opts, bolo, layer='total'):
     elif layer=='I':
         include_S = 0; include_W = 0; include_I = 1
     else:
-        print('Unknown layer'+layer+'. an_opts include "total", "wiring", "U", "W", and "I".')
+        print('Unknown layer'+layer+'. an_opts include "total", "wiring", "S, "W", and "I".')
 
     model = an_opts['model']
     supG = an_opts.get('supG', 0.0)
@@ -331,6 +319,7 @@ def G_bolotest(fit, an_opts, bolo, layer='total'):
         #        G_leg(fit, an_opts, bolo, dS,           dW1,     dI1,     dW2,    dI2,    include_S, include_W, include_I)
         G_legA = G_leg(fit, an_opts, bolo, dS_ABD,       dW1_ABD, dI1_ABC, dW2_AC, dI2_AC, include_S, include_W, include_I)   # S-W1-I1-W2-I2
         G_legB = G_leg(fit, an_opts, bolo, dS_ABD+0.087, dW1_ABD, dI1_ABC, dW2_B,  0.,     include_S, include_W, include_I, supG_width=2., legB=True)   # S-W1-I1-W2, textured substrate for 2 um
+        # G_legB = G_leg(fit, an_opts, bolo, dS_ABD+0.150, dW1_ABD, dI1_ABC, dW2_B,  0.,     include_S, include_W, include_I, supG_width=2., legB=True)   # S-W1-I1-W2, textured substrate for 2 um
         G_legC = G_leg(fit, an_opts, bolo, dS_CF,        0.,      dI1_ABC, dW2_AC, dI2_AC, include_S, include_W, include_I)   # S-I1-W2-I2 (S-I1 stack)
         G_legD = G_leg(fit, an_opts, bolo, dS_ABD,       dW1_ABD, dI_DF,   0.,     0.,     include_S, include_W, include_I)   # S-W1-I1-I2 (I stack)
         G_legE = G_leg(fit, an_opts, bolo, dS_E,         0,       0.,      dW_E,   0.,     include_S, include_W, include_I, supG_width=4.)   # S-W1-W2 (W stack), textured substrate for 4 um
@@ -690,7 +679,7 @@ def qualityplots(sim_dict, plot_opts, figsize=(17,5.75)):
         plt.errorbar(fit_params[Gind], fit_params[aind], xerr=fit_errs[Gind], yerr=fit_errs[aind], color='black', label='\\textbf{Model Fit}', capsize=2, linestyle='None')   # fit results
         plt.xlabel(xlab); plt.ylabel(ylab)
         plt.xlim(xgridlim[0], xgridlim[1]); plt.ylim(ygridlim[0], ygridlim[1])
-        plt.annotate(splot_ID, (xgridlim[0]+0.1, xgridlim[1]-0.3), bbox=dict(boxstyle="square,pad=0.3", fc='w', ec='k', lw=1))
+        plt.annotate(splot_ID, (xgridlim[0]+0.1, xgridlim[1]-0.3), bbox=dict(boxstyle='square,pad=0.3', fc='w', ec='k', lw=1))
         if ll==2:
             axpos = ax.get_position()
             cax = fig.add_axes([axpos.x1+0.02, axpos.y0+0.04, 0.01, axpos.y1-axpos.y0-0.08], label='\\textbf{Chi-Sq Value}')
@@ -811,11 +800,9 @@ def plot_modelvdata(sim_dict, plot_opts, up_bolo=None, title='', plot_bolotest=T
     vlength_data = bolo['data']['vlength_data']
     layer_ds = bolo['geometry']['layer_ds']
     lw = bolo['geometry']['lw']
-    # AoL_bolo = bolo['geometry']['AoL']
-    # A_bolo = bolo['geometry']['AoL']*bolo['geometry']['ll']
     A_bolo = bolo['geometry']['A']
 
-    calc = an_opts['calc']
+    # calc = an_opts['calc']
     fn_comments = an_opts['fn_comments']
 
     save_figs = plot_opts['save_figs']
@@ -839,51 +826,49 @@ def plot_modelvdata(sim_dict, plot_opts, up_bolo=None, title='', plot_bolotest=T
         Gpred_W = sim_dict['fit']['Gpred_W']   # predictions and error of Nb wiring layers [pW/K]
         Gpred_I = sim_dict['fit']['Gpred_I']   # predictions and error of SiNx insulating layers [pW/K]
 
-    # rchisq_fit = sim_dict['fit']['rchisq_fit']; rchisq_pred = sim_dict['fit']['rchisq_pred']; rchisq_qsum = sim_dict['fit']['rchisq_qsum']
-
     plt.figure(figsize=fs)
-    gs = gridspec.GridSpec(2, 1, height_ratios=[3,1])
+    gs = gridspec.GridSpec(2, 1, height_ratios=[2.8,1])
     ax1 = plt.subplot(gs[0])   # model vs data
 
     if plot_bolotest:
-        plt.plot(A_bolo, Gpred_S, markersize=7, color='blue', marker='d', label=r"G$_\text{S}$", linestyle='None', alpha=0.8)#, fillstyle='none', markeredgewidth=1.5)
-        plt.plot(A_bolo, Gpred_I, markersize=6, color='blueviolet', marker='s', label=r"G$_\text{I}$", linestyle='None', alpha=0.8)#, fillstyle='none', markeredgewidth=1.5)
-        plt.plot(A_bolo, Gpred_W, markersize=6, color='green', marker='v', label=r"G$_\text{W}$", linestyle='None', alpha=0.8)#, fillstyle='none', markeredgewidth=1.5)
-        plt.errorbar(A_bolo, ydata, yerr=sigma, marker='o', label=r"Data", markersize=7, color='red', capsize=3, linestyle='None')
-        plt.errorbar(A_bolo, Gpred, yerr=sigma_Gpred, color='k', marker='*', label=r"Model", markersize=9, capsize=3, linestyle='None')
+        plt.plot(    A_bolo, Gpred_S,                 color='blue',       marker='d', markersize=9,  label='G$_\\text{S}$', linestyle='None', alpha=0.8)#, fillstyle='none', markeredgewidth=1.5)
+        plt.plot(    A_bolo, Gpred_I,                 color='blueviolet', marker='s', markersize=8,  label='G$_\\text{I}$', linestyle='None', alpha=0.8)#, fillstyle='none', markeredgewidth=1.5)
+        plt.plot(    A_bolo, Gpred_W,                 color='green',      marker='v', markersize=8,  label='G$_\\text{W}$', linestyle='None', alpha=0.8)#, fillstyle='none', markeredgewidth=1.5)
+        plt.errorbar(A_bolo, ydata, yerr=sigma,       color='red',        marker='o', markersize=9,  label='Data',          linestyle='None', capsize=3, zorder=-1)
+        plt.errorbar(A_bolo, Gpred, yerr=sigma_Gpred, color='k',          marker='*', markersize=11, label='Model',         linestyle='None', capsize=3)
         for bb, boloid in enumerate(bolo_labels):
             plt.annotate(boloid, (A_bolo[bb]+0.4, ydata[bb]))
-        # plt.annotate('$\\boldsymbol{\\chi_\\nu^2}$ = '+str(round(rchisq_pred, 1)), (0.0375, 8), bbox=dict(boxstyle="square,pad=0.3", fc='w', ec='k', lw=1))
-        plt.grid(linestyle = '--', which='both', linewidth = 0.5)
-        plt.ylim(0, 19)
-        # lorder = np.array([4, 3, 0, 2, 1])
+        # plt.annotate('$\\boldsymbol{\\chi_\\nu^2}$ = '+str(round(rchisq_pred, 1)), (0.0375, 8), bbox=dict(boxstyle='square,pad=0.3', fc='w', ec='k', lw=1))
+        plt.grid(linestyle = '--', which='both', linewidth=0.5)
+        plt.ylim(0, 20)# ; plt.xlim(6, 28)
         lorder = np.array([3, 4, 0, 2, 1])
         # lorder = np.array([0, 1])
         handles, labels = ax1.get_legend_handles_labels()
         plt.legend([handles[idx] for idx in lorder],[labels[idx] for idx in lorder], loc=2)   # 2 is upper left, 4 is lower right
-        # plt.legend()
     plt.ylabel('$\\textbf{G [pW/K]}$')
-    plt.title(title)
+    # plt.title(title)
     plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)   # turn x ticks off
 
     ax2 = plt.subplot(gs[1], sharex=ax1); ax_xlim = ax1.get_xlim()   # residuals
-    plt.axhline(0, color='k', alpha=0.7)
+    plt.axhline(0, color='k', alpha=0.7, zorder=-1)
     if plot_bolotest:
-        # normres = (ydata - Gpred)/sigma_Gpred
-        normres = (ydata - Gpred)
-        plt.scatter(A_bolo, normres, color='r', s=40)
-    # if plot_vlength>0:
-    #     plt.scatter(A_bolo[0]*220/ll_vl, normres_vl, color='r', s=40)
-    plt.ylabel("\\textbf{Norm. Res.}")
-    plt.xlabel('Leg A [$\mu m^2$]')
+        normres = (ydata - Gpred)/sigma_Gpred
+        # normres = (ydata - Gpred)
+        plt.scatter(A_bolo, normres, color='r', s=80)
+    plt.ylabel('\\textbf{N. Res.}', labelpad=-2)
+    plt.xlabel('\\textbf{Leg Area [$\\boldsymbol{\mu m^\\mathit{2}}$]}')
     plt.xlim(ax_xlim)
-    # plt.ylim(-1.1, 1.1)
-    plt.tick_params(axis="y", which="both", right=True)
-    plt.grid(linestyle = '--', which='both', linewidth = 0.5)
+    plt.ylim(-1.1, 1.1)
+    # plt.tick_params(axis='y', which='both', right=True)
+    # plt.fill_between((ax_xlim), -1, 1, facecolor='k', alpha=0.2)   # +/- 1 sigma
+    plt.grid(linestyle = '--', which='both', linewidth=0.5, zorder=-1)
     plt.subplots_adjust(hspace=0.075)   # merge to share one x axis
+
     if save_figs: plt.savefig(plot_dir + 'Gpred_bolotest' + fn_comments + plot_comments + '.png', dpi=300)
+
     return
 
+### legacy data analysis
 def plot_Glegacy(legacy, plot_opts, bolotest={}, analyze_vlength=False, fs=(7,5)):
     # predicts G for legacy TES data using alpha model, then plots prediction vs measurements (scaled to 170 mK)
     # legacy geometry and measurements are from Shannon's spreadsheet, then plots
@@ -904,7 +889,7 @@ def plot_Glegacy(legacy, plot_opts, bolotest={}, analyze_vlength=False, fs=(7,5)
     # gs = gridspec.GridSpec(2, 1, height_ratios=[3,1])
     # ax1 = plt.subplot(gs[0])   # model vs data
 
-    # plt.errorbar(legacy_ll, legacy_Gs, marker='o', label=r"Legacy Data", markersize=7, color='darkorange', linestyle='None')
+    # plt.errorbar(legacy_ll, legacy_Gs, marker='o', label='Legacy Data', markersize=7, color='darkorange', linestyle='None')
     if len(bolotest.keys())>0:   # plot bolotest 1b data and prediction
         L_bolo = bolotest['geometry']['ll']
         w_bolo = bolotest['geometry']['lw']
@@ -915,20 +900,20 @@ def plot_Glegacy(legacy, plot_opts, bolotest={}, analyze_vlength=False, fs=(7,5)
         vmin = min(legacy_lw); vmax = max(legacy_lw)
     scatter = plt.scatter(legacy_ll, legacy_Gs, c=legacy_lw, s=40, vmin=vmin, vmax=vmax, linestyle='None', alpha=0.8)
     plt.ylabel('\\textbf{G [pW/K]}')
-    plt.tick_params(axis="y", which="both", right=True)
+    plt.tick_params(axis='y', which='both', right=True)
     plt.yscale('log'); plt.xscale('log')
-    plt.grid(linestyle = '--', which='both', linewidth = 0.5)
+    plt.grid(linestyle = '--', which='both', linewidth=0.5)
     plt.ylim(8,1E3)
     # if len(bolotest.keys())>0:
         # plt.legend()
         # ax2 = plt.subplot(gs[1], sharex=ax1)
     plt.tick_params(axis='x', which='both', bottom=True, top=False, labelbottom=False)   # turn x ticks off
     plt.xlabel('Leg L [$\mu$m]')
-    plt.tick_params(axis="y", which="both", right=True)
+    plt.tick_params(axis='y', which='both', right=True)
     # plt.subplots_adjust(hspace=0.075)   # merge to share one x axis
     # color bar
     cbar = plt.colorbar(scatter)
-    cbar.set_label("Leg Width [$\mu$m]")
+    cbar.set_label('Leg Width [$\mu$m]')
     if save_figs: plt.savefig(plot_dir + 'legacydata' + plot_comments + '.png', dpi=300)
 
     # vs width
@@ -940,52 +925,17 @@ def plot_Glegacy(legacy, plot_opts, bolotest={}, analyze_vlength=False, fs=(7,5)
         vmin = min(legacy_ll); vmax = max(legacy_ll)
     scatter = plt.scatter(legacy_lw, legacy_Gs, c=legacy_ll, s=40, vmin=vmin, vmax=vmax, linestyle='None', cmap='plasma_r', alpha=0.8)
     plt.ylabel('\\textbf{G [pW/K]}')
-    plt.tick_params(axis="y", which="both", right=True)
+    plt.tick_params(axis='y', which='both', right=True)
     plt.yscale('log')
-    plt.grid(linestyle = '--', which='both', linewidth = 0.5)
+    plt.grid(linestyle = '--', which='both', linewidth=0.5)
     # plt.ylim(8,1E3)
     plt.tick_params(axis='x', which='both', bottom=True, top=False)   # turn x ticks off
     plt.xlabel('Leg Width [$\mu$m]')
-    plt.tick_params(axis="y", which="both", right=True)
+    plt.tick_params(axis='y', which='both', right=True)
 
     # color bar
     cbar = plt.colorbar(scatter)
-    cbar.set_label("Leg Length [$\mu$m]")
-
-    # # G/w vs length
-    # plt.figure()
-    # if len(bolotest.keys())>0:   # plot bolotest 1b data and prediction
-    #     vmin = min(np.append(legacy_lw, w_bolo)); vmax = max(np.append(legacy_lw, w_bolo))
-    #     plt.scatter(L_bolo, bolotest['data']['ydata'][0]/w_bolo, s=40, c=w_bolo, vmin=vmin, vmax=vmax, linestyle='None', alpha=0.8)
-    # else:
-    #     vmin = min(legacy_lw); vmax = max(legacy_lw)
-    # scatter = plt.scatter(legacy_ll, legacy_Gs/legacy_lw, c=legacy_lw, s=40, vmin=vmin, vmax=vmax, linestyle='None', alpha=0.8)
-    # plt.ylabel('\\textbf{G/w [pW/K/um]}')
-    # plt.tick_params(axis="y", which="both", right=True)
-    # plt.yscale('log'); plt.xscale('log')
-    # plt.grid(linestyle = '--', which='both', linewidth = 0.5)
-    # plt.tick_params(axis='x', which='both', bottom=True, top=False)   # turn x ticks off
-    # plt.xlabel('Leg Length [$\mu$m]')
-    # plt.tick_params(axis="y", which="both", right=True)
-    # cbar = plt.colorbar(scatter); cbar.set_label("Leg Width [$\mu$m]")
-
-    # # G/w vs width
-    # plt.figure()
-    # if len(bolotest.keys())>0:   # plot bolotest 1b data and prediction
-    #     vmin = min(np.append(legacy_ll, L_bolo)); vmax = max(np.append(legacy_ll, L_bolo))
-    #     plt.scatter(w_bolo, bolotest['data']['ydata'][0]/w_bolo, s=40, c=L_bolo, vmin=vmin, vmax=vmax, linestyle='None', cmap='plasma_r', alpha=0.8)
-    # else:
-    #     vmin = min(legacy_ll); vmax = max(legacy_ll)
-    # scatter = plt.scatter(legacy_lw, legacy_Gs/legacy_lw, c=legacy_ll, s=40, vmin=vmin, vmax=vmax, linestyle='None', cmap='plasma_r', alpha=0.8)
-    # plt.ylabel('\\textbf{G/w [pW/K/um]}')
-    # plt.tick_params(axis="y", which="both", right=True)
-    # plt.yscale('log')
-    # plt.grid(linestyle = '--', which='both', linewidth = 0.5)
-    # # plt.ylim(8,1E3)
-    # plt.tick_params(axis='x', which='both', bottom=True, top=False)   # turn x ticks off
-    # plt.xlabel('Leg Width [$\mu$m]')
-    # plt.tick_params(axis="y", which="both", right=True)
-    # cbar = plt.colorbar(scatter); cbar.set_label("Leg Length [$\mu$m]")
+    cbar.set_label('Leg Length [$\mu$m]')
 
     La = legacy['geometry']['La']
     asc_legacy = ascale(legacy_ll, La)
@@ -1000,13 +950,13 @@ def plot_Glegacy(legacy, plot_opts, bolotest={}, analyze_vlength=False, fs=(7,5)
         vmin = min(legacy_ll); vmax = max(legacy_ll)
     scatter = plt.scatter(legacy_lw, legacy_Gs/legacy_lw/asc_legacy, c=legacy_ll, s=40, vmin=vmin, vmax=vmax, linestyle='None', cmap='plasma_r', alpha=0.8)
     plt.ylabel('\\textbf{G/A$\\times$(1+L/La)')
-    plt.tick_params(axis="y", which="both", right=True)
+    plt.tick_params(axis='y', which='both', right=True)
     plt.yscale('log')
-    plt.grid(linestyle = '--', which='both', linewidth = 0.5)
+    plt.grid(linestyle = '--', which='both', linewidth=0.5)
     # plt.ylim(8,1E3)
     plt.tick_params(axis='x', which='both', bottom=True, top=False)   # turn x ticks off
     plt.xlabel('Leg Width [$\mu$m]')
-    cbar = plt.colorbar(scatter); cbar.set_label("Leg Length [$\mu$m]")
+    cbar = plt.colorbar(scatter); cbar.set_label('Leg Length [$\mu$m]')
 
     plt.figure()
     if len(bolotest.keys())>0:   # plot bolotest 1b data and prediction
@@ -1016,13 +966,13 @@ def plot_Glegacy(legacy, plot_opts, bolotest={}, analyze_vlength=False, fs=(7,5)
         vmin = min(legacy_lw); vmax = max(legacy_lw)
     scatter = plt.scatter(legacy_ll, legacy_Gs/legacy_lw/asc_legacy, c=legacy_lw, s=40, vmin=vmin, vmax=vmax, linestyle='None', alpha=0.8)
     plt.ylabel('\\textbf{G/A$\\times$(1+L/La)')
-    plt.tick_params(axis="y", which="both", right=True)
+    plt.tick_params(axis='y', which='both', right=True)
     plt.yscale('log'); plt.xscale('log')
-    plt.grid(linestyle = '--', which='both', linewidth = 0.5)
+    plt.grid(linestyle = '--', which='both', linewidth=0.5)
     plt.tick_params(axis='x', which='both', bottom=True, top=False)   # turn x ticks off
     plt.xlabel('Leg Length [$\mu$m]')
-    plt.tick_params(axis="y", which="both", right=True)
-    cbar = plt.colorbar(scatter); cbar.set_label("Leg Width [$\mu$m]")
+    plt.tick_params(axis='y', which='both', right=True)
+    cbar = plt.colorbar(scatter); cbar.set_label('Leg Width [$\mu$m]')
 
     if analyze_vlength:
         plt.figure()
@@ -1034,16 +984,15 @@ def plot_Glegacy(legacy, plot_opts, bolotest={}, analyze_vlength=False, fs=(7,5)
         plt.ylabel('G [pW/K]'); plt.xlabel('Leg Length [um]')
         plt.savefig(plot_dir+'legacydata_lengthscaling.png', dpi=300)
 
-#%%
-def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,6), plot_vwidth=False, plot_bysubpop=False, show_percdiff=False, plot_wgrad=False):
+def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,6), dof=1, plot_vwidth=False, plot_bysubpop=False, show_percdiff=False, plot_wgrad=False, twomodels=False):
     # predicts G for legacy TES data using alpha model, then plots prediction vs measurements (scaled to 170 mK)
     # legacy geometry and measurements are from Shannon's spreadsheet, then plots
 
     if title=='': title = sim_dict['an_opts'].get('title')
-    save_figs = plot_opts['save_figs']
+    save_figs     = plot_opts['save_figs']
     plot_comments = plot_opts['plot_comments']
-    plot_dir = plot_opts['plot_dir']
-    plot_bolo1b = plot_opts['plot_bolo1b']
+    plot_dir      = plot_opts['plot_dir']
+    plot_bolo1b   = plot_opts['plot_bolo1b']
 
     an_opts = sim_dict['an_opts']
     fn_comments = an_opts['fn_comments']
@@ -1054,26 +1003,49 @@ def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,6)
     legacy_ll = legacy['geometry']['ll']
     legacy_lw = legacy['geometry']['lw']
 
-    Gpreds =      Gfrommodel(sim_data, an_opts, legacy)   # predictions from each set of fit parameters [pW/K]
-    GpredSs =     Gfrommodel(sim_data, an_opts, legacy, layer='S')
-    GpredWs =     Gfrommodel(sim_data, an_opts, legacy, layer='W')
-    GpredIs =     Gfrommodel(sim_data, an_opts, legacy, layer='I')
+    Gpreds  = Gfrommodel(sim_data, an_opts, legacy)   # predictions from each set of fit parameters [pW/K]
+    GpredSs = Gfrommodel(sim_data, an_opts, legacy, layer='S')
+    GpredWs = Gfrommodel(sim_data, an_opts, legacy, layer='W')
+    GpredIs = Gfrommodel(sim_data, an_opts, legacy, layer='I')
 
     Gpred   = np.median(Gpreds, axis=0); sigma_Gpred = np.std(Gpreds, axis=0)   # predictions and error [pW/K]
     Gpred_S = np.median(GpredSs, axis=0); sigma_GpredS = np.std(GpredSs, axis=0)     # predictions and error of substrate layers [pW/K]
     Gpred_W = np.median(GpredWs, axis=0); sigma_GpredW = np.std(GpredWs, axis=0)   # predictions and error [pW/K]
     Gpred_I = np.median(GpredIs, axis=0); sigma_GpredI = np.std(GpredIs, axis=0)   # predictions and error [pW/K]
 
+    if twomodels:   # plot two models on the same plot
+        legacy2 = copy.deepcopy(legacy)
+        legacy2['geometry']['La'] = legacy['geometry']['La2']
+
+        Gpreds2  = Gfrommodel(sim_data, an_opts, legacy2)   # predictions from each set of fit parameters [pW/K]
+        Gpred2   = np.median(Gpreds2, axis=0); sigma_Gpred2 = np.std(Gpreds2, axis=0)   # predictions and error [pW/K]
+        normres2 = (legacy_Gs - Gpred2)/(sigma_Gpred2)
+        m1lab = 'Model 1'
+        m2lab = 'Model 2'
+        if plot_vwidth:   # offset
+            Gpred2 = Gpred2        + 500
+            legacy_Gs2 = legacy_Gs + 500
+        else:
+            Gpred2       = Gpred2*10
+            sigma_Gpred2 = sigma_Gpred2*10
+            legacy_Gs2   = legacy_Gs*10
+    else:
+        # m1lab = 'Model'
+        m1lab = 'Constrained Model'
+
     if show_percdiff:   # plot residuals as a fraction of the measured value
         normres = (Gpred-legacy_Gs)/legacy_Gs*100 # normalized residuals [frac of measured value]
         rcolor = 'k'
-        rylab = "\\textbf{\% Diff}"
+        rylab = '\% Diff'
         rylim = [-75, 75]
     else:   # plot residuals as a fraction of prediction error
-        normres = (legacy_Gs - Gpred)/sigma_Gpred   # normalized residuals [frac of prediction error]
+        normres = (legacy_Gs - Gpred)/(sigma_Gpred)   # normalized residuals [frac of prediction error]
         rcolor = 'darkorange'
-        rylab = "\\textbf{Norm. Res.}"
-        rylim = [-2.5, 2.5]
+        rylab = '\\textbf{N. Res.}'
+        # rylim = [-2.5, 2.5]
+        rylim = [-2.75, 2.75]
+        # rylim = [-1.1, 1.1]
+        rchisq_pred = np.sum(normres**2)/dof
 
     if 'low_lw' in legacy['geometry']:   # separate out width populations
         plot_bywidth = True
@@ -1085,18 +1057,26 @@ def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,6)
     if plot_vwidth:
         legacy_x = legacy_lw
         ax_scale = 'linear'
-        x_label  = 'Width [$\mu$m]'
+        x_label  = 'Width [$\mu m$]'
         y_lim    = [0, 800]
+        x_lim    = [8.5, 43]
+        csq_loc  = [35, 75]
+
     else:
         legacy_x = legacy_ll
         ax_scale = 'log'
-        x_label  = 'Length [$\mu$m]'
+        x_label  = '\\textbf{Length [$\\boldsymbol{\mathrm{\mu m}}$]}'
         y_lim    = [8, 1E3]
-    # legacy_x = legacy_lw if plot_vwidth else legacy_ll
+        x_lim    = [40, 1500]
+        csq_loc  = [50, 12]
 
     plot_labs   = legacy['geometry']['plot_labs'] if 'plot_labs' in legacy['geometry'] else 'Legacy Data'
 
     fig = plt.figure(figsize=fs)
+    # if twomodels:
+    #     ax1 = plt.gca()
+    # else:
+    # m1lab = 'Model'
     gs = gridspec.GridSpec(2, 1, height_ratios=[3, 1])
     ax1 = plt.subplot(gs[0])   # model vs data
 
@@ -1104,7 +1084,7 @@ def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,6)
     if plot_bolo1b:   # plot bolotest 1b data and prediction
         ll_1b = bolotest['geometry']['ll']
         lw_1b = bolotest['geometry']['lw']
-        G_1b = bolotest['data']['ydata'][0]
+        G_1b  = bolotest['data']['ydata'][0]
 
         vmin = min(np.append(legacy_lw, lw_1b)); vmax = max(np.append(legacy_lw, lw_1b))
         Gpred1bs = Gfrommodel(sim_data, an_opts, bolotest, layer='total')
@@ -1124,10 +1104,9 @@ def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,6)
         if plot_bywidth:
             plt.errorbar(ll_1b, G_1b, marker='o', label='Bolo 1 ($w=5$ $\mu$m)', markersize=7, color='red', linestyle='None', alpha=0.8)
         else:
-            plt.errorbar(x_1b, G_1b, yerr=sigma_G1bpred, marker='o', label='Bolo 1',                 markersize=7, color='red', linestyle='None', alpha=0.8)
-
-        # plt.errorbar(x_1b, Gpred1b, yerr=sigma_G1bpred, marker='*', color='red', markersize=9, capsize=3, alpha=0.6)
-        lorder = [0, 1, 2]
+            plt.errorbar(x_1b, G_1b, yerr=sigma_G1bpred, marker='o', label='Bolo 1', markersize=9, capsize=3, color='red', linestyle='None', alpha=0.8)
+        plt.errorbar(x_1b, Gpred1b, yerr=sigma_G1bpred, marker='*', color='k', markersize=11, capsize=3, alpha=0.6)
+        lorder = [0, 2, 1]
     else:
         vmin = min(legacy_lw); vmax = max(legacy_lw)
 
@@ -1141,51 +1120,60 @@ def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,6)
         for sp, pop in enumerate(sps):
             plt.plot(legacy_x[pop],  legacy_Gs[pop],  markersize=7, marker='o', label=plot_labs[sp], linestyle='None')
         lorder = np.concatenate([[0], np.arange(len(sps))+1])
+    elif plot_wgrad:
+        scatter = plt.scatter(legacy_x, legacy_Gs, c=legacy_lw, cmap='viridis', s=40, vmin=vmin, vmax=vmax, label='Legacy Data')
     else:
-        plt.plot(legacy_x, legacy_Gs, markersize=7, marker='o', label='Legacy Data', linestyle='None', color='darkorange')
-    plt.errorbar(legacy_x, Gpred, yerr=sigma_Gpred, marker='*', label='Model', capsize=3, linestyle='None', markersize=9, color='k', alpha=0.4)
+        plt.plot(legacy_x, legacy_Gs,                marker='o', markersize=9, linestyle='None', color='darkorange', label='Legacy Data')
+        if twomodels: plt.plot(legacy_x, legacy_Gs2, marker='o', markersize=9, linestyle='None', color='darkorange')
+    plt.errorbar(legacy_x, Gpred, yerr=sigma_Gpred,  marker='*', markersize=11, linestyle='None', color='k', label=m1lab, capsize=3, alpha=0.4)
+    if twomodels:
+        plt.errorbar(legacy_x, Gpred2, yerr=sigma_Gpred2, marker='^', label=m2lab, capsize=3, linestyle='None', fillstyle='none', markersize=9, color='blue', alpha=0.4)
+        lorder = [0, 1, 2]
     # plt.plot(legacy_x, Gpred_S, markersize=7, color='blue', marker='d', linestyle='None')
     plt.ylabel('\\textbf{G [pW/K]}')
-    plt.ylim(y_lim)
+    plt.xlim(x_lim)
 
-    plt.tick_params(axis="y", which="both", right=True)
+    # plt.tick_params(axis='y', which='both', right=True)
     plt.yscale(ax_scale); plt.xscale(ax_scale)
-    plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)   # turn x ticks off
-    plt.grid(linestyle = '--', which='both', linewidth = 0.5)
+    plt.grid(linestyle = '--', which='both', linewidth=0.5)
 
     handles, labels = ax1.get_legend_handles_labels()
     plt.legend([handles[idx] for idx in lorder],[labels[idx] for idx in lorder])
-    # legend_without_duplicate_labels(ax1)
 
+    # if not show_percdiff: plt.annotate('$\\boldsymbol{\\chi_\\nu^2}$ = '+str(round(rchisq_pred, 2)), csq_loc, bbox=dict(boxstyle='square,pad=0.3', fc='w', ec='k', lw=1))
+    plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)   # turn x ticks off
+
+    ### residuals
     ax2 = plt.subplot(gs[1], sharex=ax1); ax_xlim = ax2.get_xlim()   # residuals
     plt.axhline(0, color='k', alpha=0.5)
-    # plt.fill_between((0, max(legacy_x)*5), -1, 1, facecolor="gray", alpha=0.5)   # +/- 1 sigma
     if show_percdiff:
-        plt.scatter(legacy_x, normres, color='k', s=80, marker="*")
+        plt.scatter(legacy_x, normres, color='k', s=80, marker='*')
     elif plot_bywidth:
         plt.scatter(legacy_x[low_lw],  normres[low_lw],  s=40, marker='o')
         plt.scatter(legacy_x[mid_lw],  normres[mid_lw],  s=40, marker='o')
         plt.scatter(legacy_x[high_lw], normres[high_lw], s=40, marker='o')
+        plt.fill_between((0, max(legacy_x)*5), -1, 1, facecolor='gray', alpha=0.5)   # +/- 1 sigma
     elif plot_bysubpop:
         for pop in sps:
             plt.scatter(legacy_x[pop],  normres[pop],    s=40, marker='o')
+        plt.fill_between((0, max(legacy_x)*5), -1, 1, facecolor='gray', alpha=0.5)   # +/- 1 sigma
     elif plot_wgrad:
         plt.scatter(legacy_x, normres, c=legacy_lw, cmap='viridis', s=40, vmin=vmin, vmax=vmax, alpha=0.8)
+        plt.fill_between((0, max(legacy_x)*5), -1, 1, facecolor='gray', alpha=0.5)   # +/- 1 sigma
     else:
-        plt.scatter(legacy_x, normres, color='darkorange', s=40)
-    if plot_bolo1b: plt.scatter(x_1b, normres_1b, color=rcolor, s=80, marker="*", alpha=0.6)
-    plt.xlabel(x_label)
-    plt.ylabel(rylab)
-    plt.xlim(ax_xlim)
-    plt.tick_params(axis="y", which="both", right=True)
-    plt.grid(linestyle = '--', which='both', linewidth = 0.5)
+        plt.scatter(legacy_x, normres,              color='darkorange', s=80, alpha=0.6)
+        plt.fill_between((0, max(legacy_x)*5), -1, 1, facecolor='gray', alpha=0.5)   # +/- 1 sigma
+    if plot_bolo1b: plt.scatter(x_1b, normres_1b,   color='red', s=80, marker='o', alpha=0.6)
+    if twomodels:   plt.scatter(legacy_x, normres2, color='blue', s=80, alpha=0.6, facecolors='none')
+    plt.xlabel(x_label); plt.xlim(ax_xlim)
+    plt.ylabel(rylab); plt.ylim(rylim)
+    # plt.tick_params(axis='y', which='both', right=True)
+    plt.grid(linestyle = '--', which='both', linewidth=0.5)
     plt.subplots_adjust(hspace=0.075)   # merge to share one x axis
-    plt.ylim(rylim)
 
-    if plot_wgrad:
-        # color bar
+    if plot_wgrad:   # color bar
         cbar = fig.colorbar(scatter, ax=[ax1, ax2])
-        cbar.set_label("Leg Width [$\mu$m]")
+        cbar.set_label('Leg Width [$\mu$m]')
 
     if save_figs: plt.savefig(plot_dir + 'Gpred_legacy' + fn_comments + plot_comments + '.png', dpi=300)
 
@@ -1198,41 +1186,241 @@ def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,6)
 
     return legacy
 
+def predict_Glegacy_2models(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,8), dof=1, plot_vwidth=False, show_percdiff=False, plot_wgrad=False):
+    # predicts G for legacy TES data using alpha model, then plots prediction vs measurements (scaled to 170 mK)
+    # legacy geometry and measurements are from Shannon's spreadsheet, then plots
+
+    if title=='': title = sim_dict['an_opts'].get('title')
+    save_figs = plot_opts['save_figs']
+    plot_comments = plot_opts['plot_comments']
+    plot_dir = plot_opts['plot_dir']
+    plot_bolo1b = plot_opts['plot_bolo1b']
+
+    an_opts = sim_dict['an_opts']
+    fn_comments = an_opts['fn_comments']
+    sim_data = sim_dict['sim']['fit_params']
+
+    ### legacy data
+    legacy_Gs = legacy['G170mK']
+    legacy_ll = legacy['geometry']['ll']
+    legacy_lw = legacy['geometry']['lw']
+
+    # first model predictions
+    Gpreds  = Gfrommodel(sim_data, an_opts, legacy)   # predictions from each set of fit parameters [pW/K]
+    Gpred   = np.median(Gpreds, axis=0); sigma_Gpred = np.std(Gpreds, axis=0)   # predictions and error [pW/K]
+
+    # second model predictions
+    legacy2 = copy.deepcopy(legacy)
+    legacy2['geometry']['La'] = legacy['geometry']['La2']
+
+    Gpreds2  = Gfrommodel(sim_data, an_opts, legacy2)   # predictions from each set of fit parameters [pW/K]
+    Gpred2   = np.median(Gpreds2, axis=0); sigma_Gpred2 = np.std(Gpreds2, axis=0)   # predictions and error [pW/K]
+    normres2 = (legacy_Gs - Gpred2)/(sigma_Gpred2)
+    # m1lab = 'Model 1'; m2lab = 'Model 2'
+    m1lab = '$L_{a,\\mathit{1}}$'; m2lab = '$L_{a,\\mathit{2}}$'
+
+    # type of residuals
+    if show_percdiff:   # plot residuals as a fraction of the measured value
+        normres = (Gpred-legacy_Gs)/legacy_Gs*100 # normalized residuals [frac of measured value]
+        # rylab = '\% Diff'
+        rylim = [-75, 75]
+    else:   # plot residuals as a fraction of prediction error
+        normres = (legacy_Gs - Gpred)/(sigma_Gpred)   # normalized residuals [frac of prediction error]
+        # rylab = 'Norm. Res.'
+        # rylim = [-2.5, 2.5]
+        rylim = [-2.75, 2.75]
+        # rchisq_pred = np.sum(normres**2)/dof
+
+    # plot vs length or width?
+    if plot_vwidth:
+        legacy_x = legacy_lw
+        ax_scale = 'linear'
+        x_label  = '\\textbf{Width [$\\boldsymbol{\mathrm{\mu m}}$]}'
+        y_lim    = [0, 1300]
+        x_lim    = [8.5, 43]
+        # csq_loc  = [35, 75]
+
+        # offset
+        Gpred      = Gpred     + 500
+        legacy_Gs2 = legacy_Gs
+        legacy_Gs  = legacy_Gs + 500
+
+    else:
+        legacy_x = legacy_ll
+        ax_scale = 'log'
+        # x_label  = '\\textbf{Length [\\textmu m]}'
+        x_label  = '\\textbf{Length [$\\boldsymbol{\mu m}$]}'
+        # y_lim    = [7, 1E4]
+        # x_lim    = [40, 1500]
+        y_lim    = [8, 1e3]
+        x_lim    = [45, 1500]
+        csq_loc  = [50, 12]
+
+        # offset
+        # Gpred       = Gpred*10
+        # sigma_Gpred = sigma_Gpred*10
+        legacy_Gs2  = legacy_Gs
+        # legacy_Gs   = legacy_Gs*10
+
+    # color1 = 'crimson'; color2 = 'blue'
+    # color1 = 'orchid'; color2 = 'royalblue'
+    # color1 = 'mediumorchid'; color2 = 'royalblue'
+    # color1 = 'darkorange'; color2 = 'firebrick'
+    color1 = 'k'; color2 = 'k'
+    # color1 = 'green'; color2 = 'blueviolet'
+    # color1 = 'mediumseagreen'; color2 = 'mediumorchid'
+
+    fig = plt.figure(figsize=fs)
+    gs = gridspec.GridSpec(3, 1, height_ratios=[3, 1, 1])
+    ax1 = plt.subplot(gs[0])   # model vs data
+
+    # plot data
+    if plot_wgrad:   # color data points by width gradient
+        vmin = min(legacy_lw); vmax = max(legacy_lw)
+        scatter = plt.scatter(legacy_x, legacy_Gs,  c=legacy_lw, cmap='viridis', s=80, vmin=vmin, vmax=vmax, edgecolor='none', alpha=0.5, label='Legacy Data')
+        # plt.scatter(          legacy_x, legacy_Gs2, c=legacy_lw, cmap='viridis', s=70, vmin=vmin, vmax=vmax, edgecolor='none', alpha=0.5)
+    else:
+        plt.plot(legacy_x, legacy_Gs,  marker='o', linestyle='None', fillstyle='none', color='k', markersize=10, markeredgewidth=1.5, alpha=1, label='Legacy Data')
+        plt.plot(legacy_x, legacy_Gs2, marker='o', linestyle='None', fillstyle='none', color='k', markersize=10, markeredgewidth=1.5, alpha=1)
+
+    # plot predictions
+    if plot_wgrad:
+        # color mapped error bars
+        norm   = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax, clip=True)
+        mapper = matplotlib.cm.ScalarMappable(norm=norm, cmap='viridis')
+        mcolors = np.array([(mapper.to_rgba(lw)) for lw in legacy_lw])
+        for x, Gp1, Gp2, sig, sig2, color in zip(legacy_x, Gpred, Gpred2, sigma_Gpred, sigma_Gpred2, mcolors):
+            plt.errorbar(x*1.06, Gp1, yerr=sig,  fmt='none', capsize=4, color=color, zorder=-1, alpha=0.5)
+            plt.errorbar(x*1.14, Gp2, yerr=sig2, fmt='none', capsize=4, color=color, zorder=-1, alpha=0.5)
+        # color mapped markers
+        plt.scatter(legacy_x*1.06, Gpred,  marker='D', color='white',               s=90,  edgecolor='none', zorder=0)
+        plt.scatter(legacy_x*1.06, Gpred,  marker='D', c=legacy_lw, cmap='viridis', s=90,  edgecolor='none', vmin=vmin, vmax=vmax, zorder=0, alpha=0.5, label=m1lab)
+        plt.scatter(legacy_x*1.14, Gpred2, marker='^', color='white',               s=140, edgecolor='none', zorder=0)
+        plt.scatter(legacy_x*1.14, Gpred2, marker='^', c=legacy_lw, cmap='viridis', s=140, edgecolor='none', vmin=vmin, vmax=vmax, zorder=0, alpha=0.5, label=m2lab)
+    else:
+        plt.errorbar(legacy_x*1.1, Gpred,  yerr=sigma_Gpred,  marker='D', capsize=7, color=color1, linestyle='None', markersize=9,  label=m1lab, zorder=0, alpha=0.5)
+        plt.errorbar(legacy_x*1.1, Gpred2, yerr=sigma_Gpred2, marker='^', capsize=7, color=color2, linestyle='None', markersize=10, label=m2lab, zorder=0, alpha=0.5)
+    plt.ylabel('\\textbf{G [pW/K]}', labelpad=15)
+    plt.xlim(x_lim); plt.ylim(y_lim)
+    # plt.tick_params(axis='y', which='both', right=True)
+    plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)   # turn x ticks off
+    plt.yscale(ax_scale); plt.xscale(ax_scale)
+    plt.grid(linestyle = '--', which='both', linewidth=0.5)
+
+    # legend
+    lorder = [0, 1, 2]
+    handles, labels = ax1.get_legend_handles_labels()
+    plt.legend([handles[idx] for idx in lorder],[labels[idx] for idx in lorder])
+
+    ### residuals
+    # shared y label
+    axr = fig.add_subplot(gs[1:3, 0])
+    # axr.set_ylabel('\\textbf{Norm. Residuals}', labelpad=17)
+    axr.set_ylabel('\\textbf{N. Res.}', labelpad=17)
+    plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
+
+    ax2 = plt.subplot(gs[1], sharex=ax1); ax_xlim = ax2.get_xlim()   # residuals
+    plt.axhline(0, color=color1, alpha=0.5)
+    plt.fill_between((0, max(legacy_x)*5), -1, 1, facecolor=color1, alpha=0.2)   # +/- 1 sigma
+    if plot_wgrad:   # color data points by width gradient
+        plt.scatter(legacy_x, normres, c=legacy_lw, cmap='viridis', s=80, vmin=vmin, vmax=vmax, edgecolor='none', alpha=0.5)
+    else:
+        plt.scatter(legacy_x, normres, color='k', s=80, facecolors='none', linewidths=1.5)
+    plt.xlim(ax_xlim)
+    # plt.ylabel('Model 1', fontsize=16, labelpad=-7)
+    plt.ylabel('$L_{a,\\mathit{1}}$', fontsize=18, labelpad=-8)
+    plt.ylim(rylim)
+    # plt.tick_params(axis='y', which='both', right=True)
+    plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)   # turn x ticks off
+    plt.grid(linestyle = '--', which='both', linewidth=0.5)
+    plt.subplots_adjust(hspace=0.075)   # merge to share one x axis
+
+    ax3 = plt.subplot(gs[2], sharex=ax1); ax_xlim = ax2.get_xlim()   # residuals
+    plt.axhline(0, color=color2, alpha=0.5)
+    plt.fill_between((0, max(legacy_x)*5), -1, 1, facecolor=color2, alpha=0.2)   # +/- 1 sigma
+    if plot_wgrad:   # color data points by width gradient
+        plt.scatter(legacy_x, normres2, c=legacy_lw, cmap='viridis', s=80, vmin=vmin, vmax=vmax, edgecolor='none', alpha=0.5)
+    else:
+        plt.scatter(legacy_x, normres2, color='k', s=80, facecolors='none', linewidths=1.5)
+    plt.xlabel(x_label); plt.xlim(ax_xlim)
+    # plt.ylabel('Model 2', fontsize=16, labelpad=-7)
+    plt.ylabel('$L_{a,\\mathit{2}}$', fontsize=18, labelpad=-8)
+    plt.ylim(rylim)
+    # plt.tick_params(axis='y', which='both', right=True)
+    plt.grid(linestyle = '--', which='both', linewidth=0.5)
+
+    plt.subplots_adjust(hspace=0.075, wspace=0.25, left=0.09, right=0.94)   # merge to share one x axis
+
+    if plot_wgrad:   # color bar
+        cbar = fig.colorbar(scatter, ax=[ax1, ax2, ax3, axr], aspect=30, fraction=0.03)
+        cbar.set_label('\\textbf{Leg Width [$\\boldsymbol{\mu m}$]}', fontsize=16)
+
+    if save_figs: plt.savefig(plot_dir + 'Gpred_legacy' + fn_comments + plot_comments + '.png', dpi=300)
+
+    return legacy
+
+# acoustic length analysis
 def Geff(Gb, L, La, d, da):
     # model L and d scaling in 3D diffuse to ballistic transition
     # G_diff = G_ball * La/L * d/da
     # G_effective = (G_ball^-1 + G_diff^-1)^-1
     return Gb * (1 + L/La * da/d)**(-1)
 
+def bolo_subpop(bolo, sp_inds):
+    # create sub-population bolo dictionary
+
+    bolo_sp = copy.deepcopy(bolo)
+    bolo_sp['geometry']['ll']      = bolo['geometry']['ll'][sp_inds]
+    bolo_sp['geometry']['lw']      = bolo['geometry']['lw'][sp_inds]
+    bolo_sp['geometry']['dsub']    = bolo['geometry']['dsub'][sp_inds]
+    bolo_sp['geometry']['w1w']     = bolo['geometry']['w1w'][sp_inds]
+    bolo_sp['geometry']['w2w']     = bolo['geometry']['w2w'][sp_inds]
+    bolo_sp['geometry']['dW1']     = bolo['geometry']['dW1'][sp_inds]
+    bolo_sp['geometry']['dW2']     = bolo['geometry']['dW2'][sp_inds]
+    bolo_sp['geometry']['dI1']     = bolo['geometry']['dI1'][sp_inds]
+    bolo_sp['geometry']['dI2']     = bolo['geometry']['dI2'][sp_inds]
+    bolo_sp['geometry']['A']       = bolo['geometry']['A'][sp_inds]
+    bolo_sp['geometry']['La']      = bolo['geometry']['La'][sp_inds]
+
+    bolo_sp['Tc']                  = bolo['Tc'][sp_inds]
+    bolo_sp['n']                   = bolo['n'][sp_inds]
+    bolo_sp['GTc']                 = bolo['GTc'][sp_inds]
+    bolo_sp['G170mK']              = bolo['G170mK'][sp_inds]
+
+    return bolo_sp
 
 def ell_wLratio(w, ell_i, L, Pd=1):
     x = np.min(np.array([ell_i, L]), axis=0)
     return w/(np.pi*Pd) * (1 - np.log(w/(2*Pd*x)))
 
-
-# def L_acoust(geom, A, B, C, D, ell_i, Pd=1):
-def L_acoust(geom, params, Pd=1):
+def L_acoust(geom, params, Pd=1, elli_term=True):
 
     L, w, d = geom
-    A, B, C, D, ell_i = np.append(params[:5], [np.inf]*5)[:5]
+    A, B, C, D, E, ell_i = np.append(params[:6], [np.inf]*6)[:6]
 
-    # return (C/d + (Pd * B)/w)**(-1)   # 3/pi * mfp
-    # return (1/C + (Pd * B)/w)**(-1)   # 3/pi * mfp
+    ell_i2 = ell_i if elli_term else np.inf
+    return (A/d + (Pd * B)/w + C/ell_wLratio(w, np.inf*np.ones_like(L), L) + D/ell_wLratio(w, ell_i*np.ones_like(L), np.inf*np.ones_like(L))  + E/ell_wLratio(w, ell_i*np.ones_like(L), L) + 1/ell_i2)**(-1)
+    # return (A/d + (Pd * B)/w + C/ell_wLratio(w, np.inf*np.ones_like(L), L) + D/ell_wLratio(w, ell_i*np.ones_like(L), np.inf*np.ones_like(L))  + E/ell_wLratio(w, ell_i*np.ones_like(L), L) + 0)**(-1)   # no 1/ell_i term
+
     # return A   # constant
+    # return w / (A * Pd)
     # return ((Pd * A)/w + B/ell_wLratio(w/Pd, 1E9*np.ones_like(L), L))**(-1)   # x = L
     # return (A/ell_wLratio(w/Pd, 1E9*np.ones_like(L), L))**(-1)   # x = L
     # return ((Pd * A)/ell_wLratio(w/Pd, B*np.ones_like(L), L))**(-1)   # x = ell_i
-    # return B * ell_wLratio(w/Pd, C*np.ones_like(L), L)   # x = ell_i
-    # return ((Pd * C)/w + B / ell_wLratio(w/Pd, 1E9*np.ones_like(L), L))**(-1)   # x = L
     # return (A/d + (Pd * B)/w + 1/C)**(-1)
-    return  w / (A * Pd)
-    # return (A/d + (Pd * B)/w + C/ell_wLratio(w, 1E9*np.ones_like(L), L) + D/ell_wLratio(w, ell_i*np.ones_like(L), L) + 1/ell_i)**(-1)
+    # return ((A * Pd)/w + 1/B)**(-1)
+    # return (A/ell_wLratio(w, 1E12*np.ones_like(L), L))**(-1)   # C only, assumes all L < ell_i
+    # return (A/ell_wLratio(w, 1E12*np.ones_like(L), L) + 1/B)**(-1)   # C and ell_i, assumes all L < ell_i
+    # return (A/ell_wLratio(w, B*np.ones_like(L), L) + 1/B)**(-1)
+    # return (A/ell_wLratio(w, B*np.ones_like(L), L))**(-1)   # D only (term includes elli though), elli can be > L
+    # return (A/ell_wLratio(w, B*np.ones_like(L), 1e12*np.ones_like(L)) + 1/B)**(-1)     # D & elli, elli assumed < L
+    # return (A/ell_wLratio(w, B*np.ones_like(L), L) + 1/B)**(-1)   # D & elli, elli can be > L
+    # return (A/ell_wLratio(w, B*np.ones_like(L), np.inf*np.ones_like(L)))**(-1)
+    # return ((A * Pd)/w + B/ell_wLratio(w, C*np.ones_like(L), np.inf*np.ones_like(L)))**(-1)
 
-
-# def GvsLa_chisq(La, args):
-def GvsLa_chisq(params, args):
+def GvsLa_chisq(params, args, elli_term=True):
     # chi-squared value for fitting acoustic scaling parameters to legacy data
-    # pdb.set_trace()
+
     sim_dict, bolo = args
     sim_data = sim_dict['sim']['fit_params']
     an_opts  = sim_dict['an_opts']
@@ -1245,9 +1433,8 @@ def GvsLa_chisq(params, args):
     fit_bolo = copy.deepcopy(bolo)   # input iteration-specific layer thicknesses and G_bolotest data
 
     fit_bolo['geometry']['acoustic_Lscale'] = True
-    # fit_bolo['geometry']['La'] = La    # overwrite acoustic length
-    # fit_bolo['geometry']['La'] = La * fit_bolo['geometry']['lw']    # overwrite acoustic length
-    fit_bolo['geometry']['La'] = L_acoust(np.array([lls, lws, ds]), params)    # overwrite acoustic length
+    fit_bolo['geometry']['La'] = L_acoust(np.array([lls, lws, ds]), params, elli_term=elli_term)    # overwrite acoustic length
+    # fit_bolo['geometry']['La'] = bolo['geometry']['La']    # overwrite acoustic length
 
     Gpreds = Gfrommodel(sim_data, an_opts, fit_bolo)
     Gpred = np.median(Gpreds, axis=0); sigma_Gpred = np.std(Gpreds, axis=0)     # predictions and error [pW/K]
@@ -1256,6 +1443,66 @@ def GvsLa_chisq(params, args):
 
     return np.sum(La_chisqvals)
 
+def GvsLa_chisq_2parts(params, args, elli_term=True):
+    # chi-squared value for fitting acoustic scaling parameters to legacy data
+    # pdb.set_trace()
+    sim_dict, bolo = args
+    sim_data = sim_dict['sim']['fit_params']
+    an_opts  = sim_dict['an_opts']
+
+    Gdata = bolo['G170mK']
+
+    fit_bolo1 = copy.deepcopy(bolo)   # input iteration-specific layer thicknesses and G_bolotest data
+    fit_bolo2 = copy.deepcopy(bolo)   # input iteration-specific layer thicknesses and G_bolotest data
+
+
+    # separate microstrip an nitride stacks to fit for two different Las
+    fit_bolo2['geometry']['lw'] = fit_bolo1['geometry']['lw'] - fit_bolo1['geometry']['w1w']
+    fit_bolo2['geometry']['w1w'] = 0; fit_bolo2['geometry']['w2w'] = 0
+    fit_bolo1['geometry']['lw'] = fit_bolo1['geometry']['w1w']
+
+    ds1    = fit_bolo1['geometry']['dsub']
+    lws1   = fit_bolo1['geometry']['lw']
+    lls1   = fit_bolo1['geometry']['ll']
+
+    ds2    = fit_bolo2['geometry']['dsub']
+    lws2   = fit_bolo2['geometry']['lw']
+    lls2   = fit_bolo2['geometry']['ll']
+
+    # pdb.set_trace()
+    fit_bolo1['geometry']['acoustic_Lscale'] = True
+    fit_bolo1['geometry']['La'] = params[0]    # overwrite acoustic length
+    # fit_bolo['geometry']['La'] = bolo['geometry']['La']    # overwrite acoustic length
+
+    fit_bolo2['geometry']['acoustic_Lscale'] = True
+    fit_bolo2['geometry']['La'] = L_acoust(np.array([lls2, lws2, ds2]), np.array(params[1:]), elli_term=elli_term)    # overwrite acoustic length
+    # fit_bolo['geometry']['La'] = bolo['geometry']['La']    # overwrite acoustic length
+
+    # Gpreds = (1/Gfrommodel(sim_data, an_opts, fit_bolo1) + 1/Gfrommodel(sim_data, an_opts, fit_bolo2))**(-1)
+    Gpreds = Gfrommodel(sim_data, an_opts, fit_bolo1) + Gfrommodel(sim_data, an_opts, fit_bolo2)
+    Gpred = np.median(Gpreds, axis=0); sigma_Gpred = np.std(Gpreds, axis=0)     # predictions and error [pW/K]
+
+    La_chisqvals = (Gpred-Gdata)**2/sigma_Gpred**2
+
+    return np.sum(La_chisqvals)
+
+def G_GbandLa(geom, *params, w1w=8, alpha=1, Pd=1):   # calculate mfp based on geometry
+    # model width dependence of G given G_fullstack and G0_Istack are shared components of Gballistic
+    # mfp is a parallel sum of other mfp's and a mfp that depends on w
+
+    L, w, d = geom
+
+    # parse arbitrary number of parameters
+    Gb_FS = params[0]; Gb_IS = params[1]
+    La_params = np.append(params[2:7], [np.inf]*5)[:5]
+
+    # acoustic length
+    La = L_acoust(geom, La_params, Pd=Pd)
+
+    # Gballistic
+    Gb = (Gb_FS*w1w/10 + Gb_IS*(w-w1w)/10) * (d/2.45)**alpha   # Gb for full microstrip section and for nitride stack section
+
+    return Gb / (1 + L/La)   # Gb is ballistic G for a 5-um-wide leg
 
 def fit_acoustic_length(sim_dict, plot_opts, legacy, bolotest={}, fs=(9,6), plot_fit=True, num_params=5):
 
@@ -1280,7 +1527,8 @@ def fit_acoustic_length(sim_dict, plot_opts, legacy, bolotest={}, fs=(9,6), plot
     bounds_La = [([0]*num_params), ([np.inf]*num_params)]
 
     # afit_result = minimize(GvsLa_chisq, p0_La, args=[sim_dict, legacy], bounds=bounds_La)   # minimize chi-squared function with this iteration's G_TES values and film thicknesses
-    afit_result = minimize(GvsLa_chisq, p0_La, args=[sim_dict, legacy])   # minimize chi-squared function with this iteration's G_TES values and film thicknesses
+    # afit_result = minimize(GvsLa_chisq, p0_La, args=[sim_dict, legacy])   # minimize chi-squared function with this iteration's G_TES values and film thicknesses
+    afit_result = minimize(GvsLa_chisq_2parts, p0_La, args=[sim_dict, legacy])   # minimize chi-squared function with this iteration's G_TES values and film thicknesses
 
     La_fit = afit_result['x']
     A_fit, B_fit, C_fit, D_fit, elli_fit = np.append(La_fit[:5], [0]*5)[:5]
@@ -1290,13 +1538,13 @@ def fit_acoustic_length(sim_dict, plot_opts, legacy, bolotest={}, fs=(9,6), plot
     # La_params_all, pcov_all = curve_fit(G_fromwidth, all_geom, legacyGs_all, p0_Gw, bounds=bounds_Gw)
     # GbFS_all, GbIS_all, A_all, B_all, C_all, D_all, elli_all = np.append(La_params_all[:7], [0]*7)[:7]
 
-    fit_legacy = copy.deepcopy(legacy)   # input iteration-specific layer thicknesses and G_bolotest data
-    fit_legacy['geometry']['acoustic_Lscale'] = True
+    legacy_fit = copy.deepcopy(legacy)   # input iteration-specific layer thicknesses and G_bolotest data
+    legacy_fit['geometry']['acoustic_Lscale'] = True
 
-    # fit_legacy['geometry']['La'] = La_fit    # overwrite acoustic length
-    fit_legacy['geometry']['La'] = L_acoust(np.array([legacy_ll, legacy_lw, legacy_d]), La_fit)    # overwrite acoustic length
+    # legacy_fit['geometry']['La'] = La_fit    # overwrite acoustic length
+    legacy_fit['geometry']['La'] = L_acoust(np.array([legacy_ll, legacy_lw, legacy_d]), La_fit)    # overwrite acoustic length
     # print('La = {} um'.format(La_fit))
-    # fit_legacy['geometry']['La'] = La_fit * fit_legacy['geometry']['lw']   # overwrite acoustic length
+    # legacy_fit['geometry']['La'] = La_fit * legacy_fit['geometry']['lw']   # overwrite acoustic length
     # print('La = {} * w'.format(round(La_fit, 1)))
     print('A = {} +/- {}'.format(round(A_fit, 3), round(perr[0], 3)))
     print('B = {} +/- {}'.format(round(B_fit, 3), round(perr[1], 3)))
@@ -1306,7 +1554,7 @@ def fit_acoustic_length(sim_dict, plot_opts, legacy, bolotest={}, fs=(9,6), plot
     # print('Chi-squared = {} '.format(round(rchisq_pred,2)))
     if plot_fit:
 
-        Gpreds  = Gfrommodel(sim_data, an_opts, fit_legacy)   # predictions from each set of fit parameters [pW/K]
+        Gpreds  = Gfrommodel(sim_data, an_opts, legacy_fit)   # predictions from each set of fit parameters [pW/K]
         Gpred   = np.median(Gpreds,  axis=0); sigma_Gpred = np.std(Gpreds, axis=0)   # predictions and error [pW/K]
         normres = (legacy_Gs - Gpred)/sigma_Gpred   # normalized residuals [frac of prediction error]
         # dof = len(normres)-5 if acoust_d else len(normres)-2
@@ -1316,17 +1564,14 @@ def fit_acoustic_length(sim_dict, plot_opts, legacy, bolotest={}, fs=(9,6), plot
         plt.figure(figsize=fs)
         gs  = gridspec.GridSpec(2, 1, height_ratios=[3,1])
         ax1 = plt.subplot(gs[0])   # model vs data
-        plt.scatter( legacy_ll, legacy_Gs, color='darkorange', alpha=.8, label=r"Legacy Data", s=35)
-        plt.errorbar(legacy_ll, Gpred, yerr=sigma_Gpred, color='k', marker='*', label=r"G$_\text{pred}$", capsize=2, linestyle='None', markersize=7)
+        plt.scatter( legacy_ll, legacy_Gs, color='darkorange', alpha=.8, label='Legacy Data', s=35)
+        plt.errorbar(legacy_ll, Gpred, yerr=sigma_Gpred, color='k', marker='*', label='G$_\text{pred}$', capsize=2, linestyle='None', markersize=7)
         plt.ylabel('\\textbf{G [pW/K]}')
-        plt.tick_params(axis="y", which="both", right=True)
+        plt.tick_params(axis='y', which='both', right=True)
         plt.yscale('log'); plt.xscale('log')
         plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)   # turn x ticks off
         plt.ylabel('G [pW/K]')
-        plt.annotate('$\\boldsymbol{\\chi_\\nu^2}$ = '+str(round(rchisq_pred, 1)), (50, 20), bbox=dict(boxstyle="square,pad=0.3", fc='w', ec='k', lw=1))
-
-        # plt.annotate('L$_a = {La_fit}$ um'.format(La_fit='{'+str(round(La_fit, 1))+'}'), (500, 400), bbox=dict(boxstyle="square,pad=0.3", fc='w', ec='k', lw=1))
-        # plt.annotate('L$_a = {La_fit}$ * w'.format(La_fit='{'+str(round(La_fit, 1))+'}'), (500, 400), bbox=dict(boxstyle="square,pad=0.3", fc='w', ec='k', lw=1))
+        plt.annotate('$\\boldsymbol{\\chi_\\nu^2}$ = '+str(round(rchisq_pred, 1)), (50, 20), bbox=dict(boxstyle='square,pad=0.3', fc='w', ec='k', lw=1))
 
         if plot_bolo1b:   # plot bolotest 1b data and prediction
             ll_1b = bolotest['geometry']['ll']
@@ -1340,19 +1585,19 @@ def fit_acoustic_length(sim_dict, plot_opts, legacy, bolotest={}, fs=(9,6), plot
 
         ax2 = plt.subplot(gs[1], sharex=ax1); ax_xlim = ax2.get_xlim()   # residuals
         plt.axhline(0, color='k', alpha=0.7)
-        plt.fill_between((0, max(legacy_ll)*5), -1, 1, facecolor="gray", alpha=0.5)   # +/- 1 sigma
+        plt.fill_between((0, max(legacy_ll)*5), -1, 1, facecolor='gray', alpha=0.5)   # +/- 1 sigma
         plt.scatter(legacy_ll, normres, color='darkorange', s=35, alpha=0.8)
         if plot_bolo1b: plt.scatter(ll_1b, (G_1b-Gpred1b)/sigma_G1bpred, color='red', alpha=0.8, s=35)
         plt.xlabel('L [$\mu$m]')
-        plt.ylabel("\\textbf{Norm. Res.}")
+        plt.ylabel('\\textbf{Norm. Res.}')
         plt.xlim(ax_xlim)
-        plt.tick_params(axis="y", which="both", right=True)
+        plt.ylim(-2, 2)
+        plt.tick_params(axis='y', which='both', right=True)
         plt.subplots_adjust(hspace=0.075)   # merge to share one x axis
 
         if save_figs: plt.savefig(plot_dir+'legacydata_acousticscale_fit'+fn_comments+plot_comments+'.png', dpi=300)
 
-    return La_fit, fit_legacy
-
+    return La_fit, legacy_fit
 
 def plot_GandTFNEP(sim_dict, an_opts, plot_opts, bolo):
 
@@ -1399,9 +1644,9 @@ def plot_GandTFNEP(sim_dict, an_opts, plot_opts, bolo):
         ax1.plot(lwidths, G_W1, color='green', label='G$_\\text{TES}$, 200nm Nb', alpha=0.8)
         ax1.plot(lwidths, G_S, color='royalblue', label='G$_\\text{TES}$, Bare S', alpha=0.8)
         if plot_Gerr:
-            plt.fill_between(lwidths, G_full-Gerr_full, G_full+Gerr_full, facecolor="mediumpurple", alpha=0.2)   # error
-            plt.fill_between(lwidths, G_W1-Gerr_W1, G_W1+Gerr_W1, facecolor="limegreen", alpha=0.2)   # error
-            plt.fill_between(lwidths, G_S-Gerr_S, G_S+Gerr_S, facecolor="cornflowerblue", alpha=0.2)   # error
+            plt.fill_between(lwidths, G_full-Gerr_full, G_full+Gerr_full, facecolor='mediumpurple', alpha=0.2)   # error
+            plt.fill_between(lwidths, G_W1-Gerr_W1, G_W1+Gerr_W1, facecolor='limegreen', alpha=0.2)   # error
+            plt.fill_between(lwidths, G_S-Gerr_S, G_S+Gerr_S, facecolor='cornflowerblue', alpha=0.2)   # error
         ax1.set_xlabel('Leg Width [$\mu$m]')
         ax1.set_ylabel('G$_\\text{TES}$(170mK) [pW/K]')
         # if len(Glims)>0: ax1.set_ylim(ymin=Glims[0], ymax=Glims[1])   # user specified G y-axis limits
@@ -1412,15 +1657,15 @@ def plot_GandTFNEP(sim_dict, an_opts, plot_opts, bolo):
         ax2.plot(lwidths, NEP_W1, '--', color='green', label='NEP')   # this varies as G^1/2
         ax2.plot(lwidths, NEP_S, '--', color='royalblue', label='NEP')   # this varies as G^1/2
         if plot_NEPerr:
-            plt.fill_between(lwidths, NEP_full-NEPerr_full, NEP_full+NEPerr_full, facecolor="rebeccapurple", alpha=0.2)   # error
-            plt.fill_between(lwidths, NEP_W1-NEPerr_W1, NEP_W1+NEPerr_W1, facecolor="green", alpha=0.2)   # error
-            plt.fill_between(lwidths, NEP_S-NEPerr_S, NEP_S+NEPerr_S, facecolor="royalblue", alpha=0.2)   # error
+            plt.fill_between(lwidths, NEP_full-NEPerr_full, NEP_full+NEPerr_full, facecolor='rebeccapurple', alpha=0.2)   # error
+            plt.fill_between(lwidths, NEP_W1-NEPerr_W1, NEP_W1+NEPerr_W1, facecolor='green', alpha=0.2)   # error
+            plt.fill_between(lwidths, NEP_S-NEPerr_S, NEP_S+NEPerr_S, facecolor='royalblue', alpha=0.2)   # error
         # if len(NEPlims)>0: ax2.set_ylim(ymin=NEPlims[0], ymax=NEPlims[1])   # user specified TFNEP y-axis limits
         ax2.set_ylabel('Thermal Fluctuation NEP [aW/$\sqrt{Hz}$]')
 
         h1, l1 = ax1.get_legend_handles_labels(); h2, l2 = ax2.get_legend_handles_labels()
         ax1.legend(h1+h2, l1+l2, loc='upper left', fontsize='12', ncol=2)
-        plt.tick_params(axis="y", which="both", right=True)
+        plt.tick_params(axis='y', which='both', right=True)
         plt.tight_layout()
         if save_figs: plt.savefig(plot_dir + 'NEPandG' + fn_comments + plot_comments + '.png', dpi=300)
 
@@ -1440,24 +1685,17 @@ def plot_GandTFNEP(sim_dict, an_opts, plot_opts, bolo):
         plt.plot(lwidths, NEPfull_sq, color='rebeccapurple', label='S-W1-I1-W2-I2')
         plt.plot(lwidths, NEPW1_sq, color='green', label='S-W1')
         plt.plot(lwidths, NEPS_sq, color='royalblue', label='S')
-        # plt.axhline((NEP_FIR)**2*1E36, label='FIR Spec', color='black')
-        # plt.fill_between([0,16], 0, (NEP_FIR)**2*1E36, facecolor="black", alpha=0.1)   # FIR spectroscopy NEP limits
-        # plt.axhline((NEP_sp)**2, label='SPIDER 280 GHz', color='black')
-        # plt.fill_between([0,16], 0, (NEP_sp)**2, facecolor="black", alpha=0.1)   # FIR spectroscopy NEP limits
-        # plt.axhline((NEP_Psat)**2, label='SPIDER Loading', color='black')
-        # plt.fill_between([0,16], 0, (NEP_Psat)**2, facecolor="black", alpha=0.1)   # FIR spectroscopy NEP limits
-
         if plot_NEPerr:
-            plt.fill_between(lwidths, NEPfull_sq-NEPerrfull_sq, NEPfull_sq+NEPerrfull_sq, facecolor="rebeccapurple", alpha=0.3)   # error
-            plt.fill_between(lwidths, NEPW1_sq-NEPerrW1_sq, NEPW1_sq+NEPerrW1_sq, facecolor="green", alpha=0.3)   # error
-            plt.fill_between(lwidths, NEPS_sq-NEPerrS_sq, NEPS_sq+NEPerrS_sq, facecolor="royalblue", alpha=0.3)   # error
+            plt.fill_between(lwidths, NEPfull_sq-NEPerrfull_sq, NEPfull_sq+NEPerrfull_sq, facecolor='rebeccapurple', alpha=0.3)   # error
+            plt.fill_between(lwidths, NEPW1_sq-NEPerrW1_sq, NEPW1_sq+NEPerrW1_sq, facecolor='green', alpha=0.3)   # error
+            plt.fill_between(lwidths, NEPS_sq-NEPerrS_sq, NEPS_sq+NEPerrS_sq, facecolor='royalblue', alpha=0.3)   # error
         # if len(NEPlims)>0: plt.ylim(ymin=NEPlims[0], ymax=NEPlims[1])   # user specified TFNEP y-axis limits
         plt.xlim(min(lwidths)-max(lwidths)*0.02, max(lwidths)*1.02)
-        # plt.ylim(0,35)
-        plt.ylabel('(NEP$_\\text{TF}/\\gamma)^2$ [aW$^2$/Hz]', fontsize='18')
-        plt.xlabel('Leg Width [$\mu$m]', fontsize='18')
-        plt.legend(loc='upper left', fontsize='16')
-        plt.tick_params(axis="y", which="both", right=True)
+        plt.ylabel('(NEP$_\\text{TF}/\\gamma)^2$\ \  [aW$^2$/Hz]', fontsize=14)
+        plt.xlabel('Leg Width [$\mu$m]', fontsize=14)
+        plt.legend(loc='upper left', fontsize=12)
+        plt.grid(linestyle = '--', which='both', linewidth=0.5)
+        plt.tick_params(axis='y', which='both', right=True)
         plt.tight_layout()
         if save_figs: plt.savefig(plot_dir + 'NEPsq' + fn_comments + plot_comments + '.png', dpi=500)
 
@@ -1469,36 +1707,29 @@ def plot_GandTFNEP(sim_dict, an_opts, plot_opts, bolo):
         NEP_FIR = 1E-20   # W/rt(Hz), NEP necessary to do background limited FIR spectroscopy, Kenyon et al 2006
         NEP_Psat = TFNEP(0.170, Psat_sp/(0.170-0.100), Tb=0.100)*1E18   # NEP for target SPIDER Psat at 100 mK; aW/rt(Hz); G(Tc)~Psat/(Tc-Tb)
 
-        plt.figure(figsize=(5.5,5))
+        # plt.figure(figsize=(5.5,5))
+        plt.figure(figsize=(7,5))
         plt.plot(lwidths, NEP_full, color='rebeccapurple', label='S-W1-I1-W2-I2')
         plt.plot(lwidths, NEP_W1, color='green', label='S-W1')
         plt.plot(lwidths, NEP_S, color='royalblue', label='S')
-        # plt.axhline(NEP_FIR*1E18, label='FIR Spec', color='black')
-        # plt.fill_between([0,16], 0, (NEP_FIR)**2*1E36, facecolor="black", alpha=0.1)   # FIR spectroscopy NEP limits
-        # plt.axhline(NEP_spider*1E18, label='SPIDER 280 GHz', color='black')
-        # plt.fill_between([0,16], 0, (NEP_sp)**2, facecolor="black", alpha=0.1)   # FIR spectroscopy NEP limits
-        # plt.axhline(NEP_Psat/NEP_S, label='SPIDER Loading', color='black')
-        # plt.fill_between([0,16], 0, (NEP_Psat)**2, facecolor="black", alpha=0.1)   # FIR spectroscopy NEP limits
-        if plot_NEPerr:
-            plt.fill_between(lwidths, (NEP_full+NEPerr_full), (NEP_full-NEPerr_full), facecolor="rebeccapurple", alpha=0.3)   # error
-            plt.fill_between(lwidths, (NEP_W1+NEPerr_W1), (NEP_W1-NEPerr_W1), facecolor="green", alpha=0.3)   # error
-            plt.fill_between(lwidths, (NEP_S+NEPerr_S), (NEP_S-NEPerr_S), facecolor="royalblue", alpha=0.3)   # error
-        if NEPlims: plt.ylim(ymin=NEPlims[0], ymax=NEPlims[1])   # user specified TFNEP y-axis limits
-        # plt.xlim(min(lwidths)-max(lwidths)*0.02, max(lwidths)*1.02)
-        # plt.ylim(0,35)
-        plt.tick_params(axis="y", which="both", right=True)
-        plt.ylabel('NEP$_\\text{TF}/\\sqrt{\\gamma}$ [aW/$\\sqrt{Hz}$]', fontsize='18')
-        plt.xlabel('Leg Width [$\mu$m]', fontsize='18')
-        plt.legend(loc='upper left', fontsize='14')
-        plt.tight_layout()
-        if save_figs: plt.savefig(plot_dir + 'NEP' + fn_comments + plot_comments + '.png', dpi=500)
 
+        if plot_NEPerr:
+            plt.fill_between(lwidths, (NEP_full+NEPerr_full), (NEP_full-NEPerr_full), facecolor='rebeccapurple', alpha=0.3)   # error
+            plt.fill_between(lwidths, (NEP_W1+NEPerr_W1), (NEP_W1-NEPerr_W1), facecolor='green', alpha=0.3)   # error
+            plt.fill_between(lwidths, (NEP_S+NEPerr_S), (NEP_S-NEPerr_S), facecolor='royalblue', alpha=0.3)   # error
+        if NEPlims: plt.ylim(ymin=NEPlims[0], ymax=NEPlims[1])   # user specified TFNEP y-axis limits
+        # plt.tick_params(axis='y', which='both', right=True)
+        plt.ylabel('\\textbf{NEP$_\\textbf{TF}\\boldsymbol{/\\sqrt{\\gamma}}$\ \ \ [aW/$\\boldsymbol{\\sqrt{Hz}}$]}', fontsize=16)
+        plt.xlabel('\\textbf{Leg Width [$\\boldsymbol{\mu m}$]}', fontsize=16) # $\\boldsymbol{\mathrm{\mu m}}$
+        plt.xlim(min(lwidths), max(lwidths)); plt.ylim(0, 12)
+        plt.legend(loc='upper left', fontsize=14)
+        plt.grid(linestyle = '--', which='both', linewidth=0.5)
+        plt.tight_layout()
+
+        if save_figs: plt.savefig(plot_dir + 'NEP' + fn_comments + plot_comments + '.png', dpi=500)
 
         return np.array([NEP_full, NEPerr_full])   # aW/rt(Hz) for bolo with microstrip on all four legs
 
-
-# def predict_PsatSO(sim_dict, dsub, lw, ll, Tc=0.160, Tbath=0.100, n=3., Lscale=1.0, model='Three-Layer', stack_I=False, stack_N=False, plot_predsvdata=False,
-#                    AoL=[], Psat_data=[], title='', print_results=False, pred_wfit=False,  plot_dir='./', save_figs=False, fn_comments=''):
 def predict_PsatSO(sim_dict, an_opts, bolo, Tc=0.160, Tbath=0.100, n=3., plot_predsvdata=False,
                    title='', print_results=False, pred_wfit=False, plot_dir='./', save_figs=False, fn_comments='', linscale=False, lsind=1):
     """
@@ -1521,7 +1752,7 @@ def predict_PsatSO(sim_dict, an_opts, bolo, Tc=0.160, Tbath=0.100, n=3., plot_pr
     lw   = bolo['geometry']['lw']
     ll   = bolo['geometry']['ll']
     Psat_data = bolo['Psat']
-    La = bolo['geometry']['La']
+    # La = bolo['geometry']['La']
     # Lscale = bolo['geometry']['pLscale']
     if linscale:
         # lscale = ascale(ll, La)/ascale(ll[lsind], La)
@@ -1569,9 +1800,9 @@ def predict_PsatSO(sim_dict, an_opts, bolo, Tc=0.160, Tbath=0.100, n=3., plot_pr
         plt.ylabel('Predicted P$_\\text{sat}$(160mK) [pW]')
         plt.title(title)
         plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)   # turn x ticks off
-        plt.tick_params(axis="y", which="both", right=True)
+        plt.tick_params(axis='y', which='both', right=True)
         plt.ylim(0, 12)
-        plt.grid(linestyle = '--', which='both', linewidth = 0.5)
+        plt.grid(linestyle = '--', which='both', linewidth=0.5)
         if linscale: plt.legend(loc='upper left')
 
         # normres = (Psat_pred - Psat_data)/sigma_Psat
@@ -1581,30 +1812,29 @@ def predict_PsatSO(sim_dict, an_opts, bolo, Tc=0.160, Tbath=0.100, n=3., plot_pr
         # if linscale:
         #     plt.errorbar(Psat_data, Psat_pred - Psat_data, yerr=sigma_Psat, marker='*', capsize=2, linestyle='None', color='k')
         #     plt.plot(Psat_data, Psat_lin - Psat_data, marker='o', linestyle='None', color='r', ms=7, label='Lin. Scale', alpha=0.7)
-        #     plt.ylabel("Res. [pW]")
+        #     plt.ylabel('Res. [pW]')
         #     # plt.ylim(-2, 2)
         # else:
             # plt.errorbar(Psat_data, normres, yerr=sigma_Psat, marker='*', capsize=2, linestyle='None', color='k')
-            # plt.ylabel("Norm. Res.")
+            # plt.ylabel('Norm. Res.')
         # plt.errorbar(Psat_data, normres, yerr=sigma_Psat, marker='*', capsize=2, linestyle='None', color='k', ms=10)
         # if linscale: plt.plot(Psat_data, (Psat_lin-Psat_data)/sigma_Psat, marker='o', linestyle='None', color='r', ms=7, label='Lin. Scale', alpha=0.7)
         plt.errorbar(Psat_data, normres*100, yerr=sigma_Psat/Psat_data*100, marker='*', capsize=2, linestyle='None', color='k', ms=10)
         if linscale: plt.plot(Psat_data, (Psat_lin-Psat_data)/Psat_data*100, marker='o', linestyle='None', color='r', ms=7, label='Lin. Scale', alpha=0.7)
-        plt.ylabel("Norm. Res.")
-        plt.ylabel("\% Diff")
+        plt.ylabel('Norm. Res.')
+        plt.ylabel('\% Diff')
         # plt.ylim(-4, 4)
         # plt.ylim(-30, 30)
         # plt.ylim(-3, 3)
         plt.xlabel('Measured P$_\\text{sat}$ [pW]')
         plt.xlim(2, 9)
-        plt.tick_params(axis="y", which="both", right=True)
+        plt.tick_params(axis='y', which='both', right=True)
         plt.subplots_adjust(hspace=0.075)   # merge to share one x axis
-        plt.grid(linestyle = '--', which='both', linewidth = 0.5)
+        plt.grid(linestyle = '--', which='both', linewidth=0.5)
 
         if save_figs: plt.savefig(plot_dir + 'SOPsat_predsvdata_'+fn_comments+'.pdf')
 
     return Psat_pred, sigma_Psat
-
 
 def target_width(target_Psat, fit, dsub, ll, lw0=15., Lscale=1.0, model='Three-Layer', stack_I=False, stack_N=False):
 
@@ -1622,7 +1852,7 @@ def predictPsat_vlwidth(sim_dict, lws, dsub, ll, Lscale=1.0, tPsat=None, lw0=15,
     plt.figure()
     plt.plot(lws, Psats, color='k')
 
-    plt.fill_between(lws, Psats-sigma_Psats, Psats+sigma_Psats, facecolor="gray", alpha=0.5)
+    plt.fill_between(lws, Psats-sigma_Psats, Psats+sigma_Psats, facecolor='gray', alpha=0.5)
     plt.hlines(tPsat, min(lws), max(lws), linestyle='--', color='k')
     plt.xlabel('Leg Width [um]'); plt.ylabel('Psat [pW]')
     if tPsat:
@@ -1635,8 +1865,6 @@ def predictPsat_vlwidth(sim_dict, lws, dsub, ll, Lscale=1.0, tPsat=None, lw0=15,
     if save_figs: plt.savefig(plot_dir + 'Psat_vwidth_prediction_target'+str(tPsat)+'pW.png', dpi=300)
 
     return Psats, sigma_Psats
-
-
 
 ### analyze results and compare with literature values
 def phonon_wlength(vs, T, domcoeff=2.82):   # returns dominant phonon wavelength in vel units * s (probably um)
@@ -1728,7 +1956,6 @@ def refl_coeff(rho1, v1, rho2, v2, T=0.170):
 
     return rcoff
 
-
 def trans_coeff_simple(rho1, v1, rho2, v2, T=0.170):
     # simple transmission coefficient from wave mechanics
     # assumes normal incidence
@@ -1750,7 +1977,6 @@ def trans_coeff_simple(rho1, v1, rho2, v2, T=0.170):
     # print('Transmission coefficient = {tcoff}'.format(tcoff=round(tcoff,4)))
 
     return tcoff
-
 
 def plot_tcoeff():
     theta_test = np.linspace(0, np.pi/2)
@@ -1776,7 +2002,6 @@ def Cv(T, TD, Tc, volmol, gamma=7.8E-3, carrier=''):   # volumetric heat capacit
     # elif carrier=='phonon': C_v = ((12*np.pi**4*kB)/5 * (T/TDebye(vs_Nb, volmol_Nb))**3) * NA/volmol  # phonon specific heat from low temp limit of Debye model, J/K/m^3 (= 1E-6 pJ/K/um^3)
     else: print("Invalid carrier, an_opts are 'phonon' or 'electron'")
     return C_v
-
 
 def TDebye(vs, volmol):
     return planck * vs / (2*np.pi * kB) * (6*np.pi**2 * NA/volmol)**(1/3)   # K
@@ -1868,7 +2093,6 @@ def G_radtheory(d, w, L, vst, vsl, T=0.170, dim='3D', lim='diff'):
 
     return xi * G0
 
-
 def firstterm(n, J):
     subJ = 1E-5 if J==0 else J
     return n**3 * ( (J+1)**3 * I_mfp( 1/(n*(J+1)) ) - J**3 * I_mfp( 1/(n*subJ) ) )
@@ -1895,7 +2119,6 @@ def sumfunc_J(n, f, J):
     return f*(1-f)**J * (firstterm + secondterm)   # initial interpretation of Wybourne
     # return f**J*(1-f) * (firstterm + secondterm)
     # return f*(1-f) * (firstterm + secondterm)
-
 
 def l_eff(w, d, f, sumlim=1E3):   # boundary-limited phonon mfp including spectral scattering from Wybourne84
     # inputs are leg width and thickness in the same units (probably um); w>d
@@ -1925,7 +2148,6 @@ def G_Holmes(A, T, xi=1):
     # x-sectional area A should be um^2
     sigmaSF = 15.7*10  # pW/K^4/um^2
     return 4*A*sigmaSF*T**3*xi   # pW/K
-
 
 def l_PLT02(vs):   # mfp at 170 mK for amorphous solids from dominant phonon wavelength ratio
     # inverse Q is internal friction
@@ -1972,7 +2194,6 @@ def f_BE(f, T):
     #     """
     #     A = 4*( (dsub + dI1 + dI2)*lwidth + dW1*w1w + dW2*w2w )   # [um^2] cross-sectional area of four legs, thickness is substrate + wiring stack
     #     return A/llength   # [um] cross=sectional area of four legs / length of the legs
-
 
 def legend_without_duplicate_labels(ax):
     handles, labels = ax.get_legend_handles_labels()
