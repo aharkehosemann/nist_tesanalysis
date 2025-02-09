@@ -69,7 +69,7 @@ def GtoKappa(G, A, L):   # thermal conductance, area, length
 def KappatoG(kappa, A, L):   # thermal conductance in pW/K/um, area in um^2, length in um
     return kappa*A/L
 
-# ### Thermal Fluctuation Noise Equivalent Power
+### thermal fluctuation noise equivalent power
 def TFNEP(Tc, G, Tb=0.100, gamma=1):   # calculate thermal fluctuation noise equivalent power as a function of G and T_TES
     # return np.sqrt(4*kB*G*FLink(Tb, Tc))*Tc
     return np.sqrt(4*kB*G*gamma)*Tc   # FLink only analytical for Nb
@@ -156,6 +156,11 @@ def G_layer(fit, d, layer='S', model='Three-Layer'):
         if   layer=='S': linds=np.array([0,3]); d0=.400   # substrate layer parameter indexes and defaSlt thickness in um
         elif layer=='W': linds=np.array([1,4]); d0=.400   # Nb layer parameter indexes and defaSlt thickness in um
         elif layer=='I': linds=np.array([2,5]); d0=.400   # insulating layer parameter indexes and defaSlt thickness in um
+    if model=='Four-Layer':   # treat substrate bi-layer as separate layers
+        if   layer=='SiO': linds=np.array([0, 0]); d0=.120   # substrate layer parameter indexes and defaSlt thickness in um
+        if   layer=='S': linds=np.array([1,4]); d0=.400   # substrate layer parameter indexes and defaSlt thickness in um
+        elif layer=='W': linds=np.array([2,5]); d0=.400   # Nb layer parameter indexes and defaSlt thickness in um
+        elif layer=='I': linds=np.array([3,6]); d0=.400   # insulating layer parameter indexes and defaSlt thickness in um
     elif model=='Two-Layer':   # treat substrate and insulating nitride as the same layer
         if   layer=='S': linds=np.array([0,2]); d0=.400   # nitride layer parameter indexes and defaSlt thickness in um
         elif layer=='W': linds=np.array([1,3]); d0=.400   # Nb layer parameter indexes and defaSlt thickness in um
@@ -205,7 +210,7 @@ def acoust_factor(bolo):
     return a_factor
 
 def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, include_I,
-          supG_width=0., legB=False):
+          include_SiO=False, supG_width=0., legB=False):
 
     model   = an_opts.get('model')
     stack_I = an_opts.get('stack_I')
@@ -217,7 +222,6 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
 
     # scale with L and d in diffuse / ballistic transition
     if bolo['geometry'].get('acoustic_Lscale'):   # use acoustic scaling
-        # scale_S, scale_W1, scale_W2, scale_I1, scale_I2, scale_I1I2 = acoust_factor(fit, bolo, dS, dW1, dI1, dW2, dI2)
         a_factor = acoust_factor(bolo)
     else:   # use power law length scaling
         pLscale = copy.copy(bolo['geometry']['pLscale'])
@@ -227,32 +231,37 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
     G_W = (G_layer(fit, dW1, layer='W', model=model) * (w1w/5)**1.0 + G_layer(fit, dW2, layer='W', model=model) * (w2w/5)**1.0 ) * a_factor * include_W
 
     ### handle nitride layers - separate vs stacked treatment
-    if model=='Three-Layer':
-        if stack_I:   # treat I1-I2 stacks in areas wider than W2 as parallel single-layer leg
-            G_S = G_layer(fit, dS, layer='S', model=model) * lw/5 * (1-supG*supG_width/5) * a_factor * include_S   # substrate still treated as separate layer
-            G_I = ((G_layer(fit, dI1, layer='I', model=model) + G_layer(fit, dI2, layer='I', model=model) ) * w1w/5 + G_layer(fit, dI1 + dI2, layer='I', model=model)*(lw-w1w)/5) * a_factor * include_I   # G_I(w<W1) are summed, G_I(w>W1) is single I stack
-        # elif stack_N:  # combine stacks with nitride wider than w1 um (S + I)
-        #     if len(fit.shape)>1:
-        #         fit_N = np.array([fit[:,0], fit[:,1], (fit[:,2]+fit[:,0])/2, fit[:,3], fit[:,4], (fit[:,5]+fit[:,3])/2]).T
-        #     else:
-        #         fit_N = np.array([fit[0], fit[1], (fit[:,0]+fit[:,2])/2, fit[3], fit[4], (fit[:,3]+fit[:,5])/2])   # parameters of S-I stack are thickness-weighted average
-        #     G_N = G_layer(fit_N, dS + dI1 + dI2, layer='I', model=model)*(lw-w1w)/5 * (1-supG) * (220/ll)**Lscale
-        #     G_S = (G_layer(fit, dS, layer='S', model=model) * w1w/5 * (220/ll)**Lscale + G_N/2) * include_S  # substrate is separate under W1
-        #     GI_inner = (G_layer(fit, dI1, layer='I', model=model) + G_layer(fit, dI2, layer='I', model=model)) * w1w/5 * (220/ll)**Lscale
-        #     GI_mid = G_layer(fit, dI1 + dI2, layer='I', model=model) * (w2w-w1w)/5 * (220/ll)**Lscale
-        #     GI_outter = G_N/2
-        #     G_I = (GI_inner + GI_mid + GI_outter) * include_I
+    # if model=='Three-Layer':
+    if stack_I:   # treat I1-I2 stacks in areas wider than W2 as parallel single-layer leg
+        if model=='Four-Layer':
+            dSiO = 0.120; dS = dS - dSiO
+            G_SiO = G_layer(fit, dSiO, layer='SiO', model=model) * lw/5 * a_factor * include_SiO
         else:
-            G_S = G_layer(fit, dS, layer='S', model=model) * lw/5 * (1-supG*supG_width/5) * a_factor * include_S   # substrate still treated as separate layer
-            G_I = (G_layer(fit, dI1, layer='I', model=model) + G_layer(fit, dI2, layer='I', model=model)) * a_factor * include_I
-        if legB:   # leg B only has 3 um wide layer of I1
+            G_SiO = 0
+        G_S = G_layer(fit, dS, layer='S', model=model) * lw/5 * (1-supG*supG_width/5) * a_factor * include_S   # substrate still treated as separate layer
+        G_I = ((G_layer(fit, dI1, layer='I', model=model) + G_layer(fit, dI2, layer='I', model=model) ) * w1w/5 + G_layer(fit, dI1 + dI2, layer='I', model=model)*(lw-w1w)/5) * a_factor * include_I   # G_I(w<W1) are summed, G_I(w>W1) is single I stack
+    # elif stack_N:  # combine stacks with nitride wider than w1 um (S + I)
+    #     if len(fit.shape)>1:
+    #         fit_N = np.array([fit[:,0], fit[:,1], (fit[:,2]+fit[:,0])/2, fit[:,3], fit[:,4], (fit[:,5]+fit[:,3])/2]).T
+    #     else:
+    #         fit_N = np.array([fit[0], fit[1], (fit[:,0]+fit[:,2])/2, fit[3], fit[4], (fit[:,3]+fit[:,5])/2])   # parameters of S-I stack are thickness-weighted average
+    #     G_N = G_layer(fit_N, dS + dI1 + dI2, layer='I', model=model)*(lw-w1w)/5 * (1-supG) * (220/ll)**Lscale
+    #     G_S = (G_layer(fit, dS, layer='S', model=model) * w1w/5 * (220/ll)**Lscale + G_N/2) * include_S  # substrate is separate under W1
+    #     GI_inner = (G_layer(fit, dI1, layer='I', model=model) + G_layer(fit, dI2, layer='I', model=model)) * w1w/5 * (220/ll)**Lscale
+    #     GI_mid = G_layer(fit, dI1 + dI2, layer='I', model=model) * (w2w-w1w)/5 * (220/ll)**Lscale
+    #     GI_outter = G_N/2
+    #     G_I = (GI_inner + GI_mid + GI_outter) * include_I
+    else:
+        G_S = G_layer(fit, dS, layer='S', model=model) * lw/5 * (1-supG*supG_width/5) * a_factor * include_S   # substrate still treated as separate layer
+        G_I = (G_layer(fit, dI1, layer='I', model=model) + G_layer(fit, dI2, layer='I', model=model)) * a_factor * include_I
+    if legB:   # leg B only has 3 um wide layer of I1
             G_S = G_layer(fit, dS, layer='S', model=model) * lw/5 * a_factor * (1-supG*supG_width/5) * include_S
             G_I = G_layer(fit, dI1, layer='I', model=model) * 3/5 * a_factor * include_I
     # elif model=='Two-Layer':
-    #     G_S = G_layer(fit, dS, layer='S', model=model) * lw/5 * (220/ll)**Lscale * (1-supG*supG_width/5) * include_S   # substrate still treated as separate layer
-    #     G_I = ( (G_layer(fit, dI1, layer='S', model=model) + G_layer(fit, dI2, layer='S', model=model)) * w2w/5 + G_layer(fit, dI1 + dI2, layer='I', model=model)*(lw-w2w)/5) * (220/ll)**Lscale * include_I   # G_I(w<W2) are summed, G_I(w>W2) is single I stack
+    #     # G_S = G_layer(fit, dS, layer='S', model=model) * lw/5 * (220/ll)**Lscale * (1-supG*supG_width/5) * include_S   # substrate still treated as separate layer
+    #     # G_I = ( (G_layer(fit, dI1, layer='S', model=model) + G_layer(fit, dI2, layer='S', model=model)) * w2w/5 + G_layer(fit, dI1 + dI2, layer='I', model=model)*(lw-w2w)/5) * (220/ll)**Lscale * include_I   # G_I(w<W2) are summed, G_I(w>W2) is single I stack
 
-    return G_S + G_W + G_I
+    return G_SiO + G_S + G_W + G_I
 
 def Gfrommodel(fit, an_opts, bolo, layer='total'):   # model params, thickness of substrate, leg width, and leg length in um
     # predicts G_TES and error from our model and arbitrary bolo geometry, assumes microstrip on all four legs a la bolo 1b
@@ -327,13 +336,25 @@ def G_bolotest(fit, an_opts, bolo, layer='total'):
         G_legG = G_leg(fit, an_opts, bolo, dS_G,         0.,      0.,      0.,     0.,     include_S, include_W, include_I, supG_width=4.)   # bare S, textured substrate for 4 um
 
     elif model=='Two-Layer':   # treat all nitride layers as the same layer, relevant on legs C and F
-        G_legA = G_layer(fit, dS_ABD, layer='S', model=model)*include_S + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W   + G_layer(fit, dI1_ABC, layer='S', model=model)*include_I     + G_layer(fit, dW2_AC, layer='W', model=model)*3/5*include_W + G_layer(fit, dI2_AC, layer='S', model=model)*include_I   # S-W1-I1-W2-I2
+        G_legA = G_layer(fit, dS_ABD, layer='S', model=model)*include_S                    + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W   + G_layer(fit, dI1_ABC, layer='S', model=model)*include_I     + G_layer(fit, dW2_AC, layer='W', model=model)*3/5*include_W + G_layer(fit, dI2_AC, layer='S', model=model)*include_I   # S-W1-I1-W2-I2
         G_legB = G_layer(fit, dS_ABD+0.087, layer='S', model=model)*include_S*(1-supG*2/5) + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W   + G_layer(fit, dI1_ABC, layer='S', model=model)*3/5*include_I + G_layer(fit, dW2_B, layer='W', model=model)*3/5*include_W   # S-W1-I1-W2
         G_legC = G_layer(fit, dS_CF+dI1_ABC, layer='S', model=model)*(include_S*dS_CF/(dS_CF+dI1_ABC)+include_I*dI1_ABC/(dS_CF+dI1_ABC))+ 0 + 0                                                   + G_layer(fit, dW2_AC, layer='W', model=model)*3/5*include_W + G_layer(fit, dI2_AC, layer='S', model=model)*include_I   # S-I1-W2-I2, S-I1 is one layer
         G_legD = G_layer(fit, dS_ABD, layer='S', model=model)*include_S + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W   + G_layer(fit, dI_DF, layer='S', model=model)*include_I   # S-W1-I1-I2 (I stack is one layer)
         G_legE = G_layer(fit, dS_E, layer='S', model=model)*include_S*(1-supG*4/5)   + G_layer(fit, dW_E, layer='W', model=model)*3/5*include_W   # S-W1-W2 (W stack)
         G_legF = G_layer(fit, dS_CF+dI_DF, layer='S', model=model)*(include_S*dS_CF/(dS_CF+dI_DF)+include_I*dI_DF/(dS_CF+dI_DF))   # S-I1-I2 (S-I1-I2 stack is one layer)
         G_legG = G_layer(fit, dS_G, layer='S', model=model)*include_S*(1-supG*4/5)   # bare S
+
+    elif model=='Four-Layer':
+        #        G_leg(fit, an_opts, bolo, dS,           dW1,     dI1,     dW2,    dI2,    include_S, include_W, include_I)
+        G_legA = G_leg(fit, an_opts, bolo, dS_ABD,       dW1_ABD, dI1_ABC, dW2_AC, dI2_AC, include_S, include_W, include_I, include_SiO=True)   # S-W1-I1-W2-I2
+        G_legB = G_leg(fit, an_opts, bolo, dS_ABD+0.087, dW1_ABD, dI1_ABC, dW2_B,  0.,     include_S, include_W, include_I, include_SiO=True, supG_width=2., legB=True)   # S-W1-I1-W2, textured substrate for 2 um
+        # G_legB = G_leg(fit, an_opts, bolo, dS_ABD+0.150, dW1_ABD, dI1_ABC, dW2_B,  0.,     include_S, include_W, include_I, supG_width=2., legB=True)   # S-W1-I1-W2, textured substrate for 2 um
+        G_legC = G_leg(fit, an_opts, bolo, dS_CF,        0.,      dI1_ABC, dW2_AC, dI2_AC, include_S, include_W, include_I, include_SiO=True)   # S-I1-W2-I2 (S-I1 stack)
+        G_legD = G_leg(fit, an_opts, bolo, dS_ABD,       dW1_ABD, dI_DF,   0.,     0.,     include_S, include_W, include_I, include_SiO=True)   # S-W1-I1-I2 (I stack)
+        G_legE = G_leg(fit, an_opts, bolo, dS_E,         0,       0.,      dW_E,   0.,     include_S, include_W, include_I, include_SiO=True, supG_width=4.)   # S-W1-W2 (W stack), textured substrate for 4 um
+        G_legF = G_leg(fit, an_opts, bolo, dS_CF,        0.,      dI_DF,   0.,     0.,     include_S, include_W, include_I, include_SiO=True)   # S-I1-I2 (I stack)
+        G_legG = G_leg(fit, an_opts, bolo, dS_G,         0.,      0.,      0.,     0.,     include_S, include_W, include_I, include_SiO=True, supG_width=4.)   # bare S, textured substrate for 4 um
+
 
     # G_TES for bolotest devices
     G_1b = 4*G_legA                         # aka Bolo 1 = 4x(S-W1-I1-W2-I2);                                   slightly over (same quality) with higher G_S in two-layer model
@@ -353,7 +374,7 @@ def G_bolotest(fit, an_opts, bolo, layer='total'):
     else:   # return values for each row, prob result of simulation
         return np.array([G_1b, G_24, G_23, G_22, G_21, G_20, G_7, G_13]).T
 
-### Fit Model
+### fit model
 def chisq_val(params, args):   # calculates chi-squared value
 
     an_opts, bolo = args
@@ -858,7 +879,8 @@ def plot_modelvdata(sim_dict, plot_opts, up_bolo=None, title='', plot_bolotest=T
     plt.ylabel('\\textbf{N. Res.}', labelpad=-2)
     plt.xlabel('\\textbf{Leg Area [$\\boldsymbol{\mu m^\\mathit{2}}$]}')
     plt.xlim(ax_xlim)
-    plt.ylim(-1.1, 1.1)
+    # plt.ylim(-1.1, 1.1)
+    plt.ylim(-5, 5)
     # plt.tick_params(axis='y', which='both', right=True)
     # plt.fill_between((ax_xlim), -1, 1, facecolor='k', alpha=0.2)   # +/- 1 sigma
     plt.grid(linestyle = '--', which='both', linewidth=0.5, zorder=-1)
@@ -1186,7 +1208,7 @@ def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,6)
 
     return legacy
 
-def predict_Glegacy_2models(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,8), dof=1, plot_vwidth=False, show_percdiff=False, plot_wgrad=False):
+def predict_Glegacy_2models(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,8), plot_vwidth=False, show_percdiff=False, plot_wgrad=False):
     # predicts G for legacy TES data using alpha model, then plots prediction vs measurements (scaled to 170 mK)
     # legacy geometry and measurements are from Shannon's spreadsheet, then plots
 
@@ -1217,7 +1239,8 @@ def predict_Glegacy_2models(sim_dict, plot_opts, legacy, bolotest={}, title='', 
     Gpred2   = np.median(Gpreds2, axis=0); sigma_Gpred2 = np.std(Gpreds2, axis=0)   # predictions and error [pW/K]
     normres2 = (legacy_Gs - Gpred2)/(sigma_Gpred2)
     # m1lab = 'Model 1'; m2lab = 'Model 2'
-    m1lab = '$L_{a,\\mathit{1}}$'; m2lab = '$L_{a,\\mathit{2}}$'
+    # m1lab = '$L_{a,\\mathit{1}}$'; m2lab = '$L_{a,\\mathit{2}}$'
+    m1lab = '$\ell_{\\mathit{1}}$'; m2lab = '$\ell_{\\mathit{2}}$'
 
     # type of residuals
     if show_percdiff:   # plot residuals as a fraction of the measured value
@@ -1277,7 +1300,7 @@ def predict_Glegacy_2models(sim_dict, plot_opts, legacy, bolotest={}, title='', 
     # plot data
     if plot_wgrad:   # color data points by width gradient
         vmin = min(legacy_lw); vmax = max(legacy_lw)
-        scatter = plt.scatter(legacy_x, legacy_Gs,  c=legacy_lw, cmap='viridis', s=80, vmin=vmin, vmax=vmax, edgecolor='none', alpha=0.5, label='Legacy Data')
+        scatter = plt.scatter(legacy_x, legacy_Gs,  c=legacy_lw, cmap='viridis', s=90, vmin=vmin, vmax=vmax, edgecolor='none', alpha=0.5, label='Legacy Data')
         # plt.scatter(          legacy_x, legacy_Gs2, c=legacy_lw, cmap='viridis', s=70, vmin=vmin, vmax=vmax, edgecolor='none', alpha=0.5)
     else:
         plt.plot(legacy_x, legacy_Gs,  marker='o', linestyle='None', fillstyle='none', color='k', markersize=10, markeredgewidth=1.5, alpha=1, label='Legacy Data')
@@ -1289,26 +1312,48 @@ def predict_Glegacy_2models(sim_dict, plot_opts, legacy, bolotest={}, title='', 
         norm   = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax, clip=True)
         mapper = matplotlib.cm.ScalarMappable(norm=norm, cmap='viridis')
         mcolors = np.array([(mapper.to_rgba(lw)) for lw in legacy_lw])
+
         for x, Gp1, Gp2, sig, sig2, color in zip(legacy_x, Gpred, Gpred2, sigma_Gpred, sigma_Gpred2, mcolors):
-            plt.errorbar(x*1.06, Gp1, yerr=sig,  fmt='none', capsize=4, color=color, zorder=-1, alpha=0.5)
-            plt.errorbar(x*1.14, Gp2, yerr=sig2, fmt='none', capsize=4, color=color, zorder=-1, alpha=0.5)
-        # color mapped markers
-        plt.scatter(legacy_x*1.06, Gpred,  marker='D', color='white',               s=90,  edgecolor='none', zorder=0)
-        plt.scatter(legacy_x*1.06, Gpred,  marker='D', c=legacy_lw, cmap='viridis', s=90,  edgecolor='none', vmin=vmin, vmax=vmax, zorder=0, alpha=0.5, label=m1lab)
-        plt.scatter(legacy_x*1.14, Gpred2, marker='^', color='white',               s=140, edgecolor='none', zorder=0)
-        plt.scatter(legacy_x*1.14, Gpred2, marker='^', c=legacy_lw, cmap='viridis', s=140, edgecolor='none', vmin=vmin, vmax=vmax, zorder=0, alpha=0.5, label=m2lab)
+            # model 1
+            plt.errorbar(x*1.07, Gp1, yerr=sig, marker='D', capsize=4, color='white', zorder=-1, linestyle='None', markeredgecolor='none', markersize=10)
+            plt.errorbar(x*1.07, Gp1, yerr=sig, marker='D', capsize=4, color=color,   zorder=-1, linestyle='None', markeredgecolor='none', markersize=10, alpha=0.5, label=m1lab)
+            # model 2
+            plt.errorbar(x*1.14, Gp2, yerr=sig2, marker='^', capsize=4, color='white', zorder=-1, linestyle='None', markeredgecolor='none', markersize=10)
+            plt.errorbar(x*1.14, Gp2, yerr=sig2, marker='^', capsize=4, color=color,   zorder=-1, linestyle='None', markeredgecolor='none', markersize=10, alpha=0.5, label=m2lab)
     else:
         plt.errorbar(legacy_x*1.1, Gpred,  yerr=sigma_Gpred,  marker='D', capsize=7, color=color1, linestyle='None', markersize=9,  label=m1lab, zorder=0, alpha=0.5)
         plt.errorbar(legacy_x*1.1, Gpred2, yerr=sigma_Gpred2, marker='^', capsize=7, color=color2, linestyle='None', markersize=10, label=m2lab, zorder=0, alpha=0.5)
+    if plot_bolo1b:   # plot bolotest 1b data and prediction
+        ll_1b = bolotest['geometry']['ll']
+        lw_1b = bolotest['geometry']['lw']
+        G_1b  = bolotest['data']['ydata'][0]
+
+        vmin = min(np.append(legacy_lw, lw_1b)); vmax = max(np.append(legacy_lw, lw_1b))
+        Gpred1bs = Gfrommodel(sim_data, an_opts, bolotest, layer='total')
+        Gpred1b = np.median(Gpred1bs); sigma_G1bpred = np.std(Gpred1bs)   # predictions and error [pW/K]
+        normres_1b= (Gpred1b-G_1b)/G_1b*100 if show_percdiff else (G_1b - Gpred1b)/sigma_G1bpred   # normalized residuals [frac of measured value or frac of prediction error]
+
+        # plt.scatter(ll_1b, G_1b, color='red', alpha=.8, label='Bolo 1', s=40)
+        x_1b = lw_1b if plot_vwidth else ll_1b
+        plt.errorbar(x_1b, G_1b, marker='o', label='Bolo 1', markersize=10, capsize=3, color='red', linestyle='None', markeredgecolor='none', alpha=0.7)
+
+        color_1b =mapper.to_rgba(lw_1b)
+        plt.errorbar(x_1b*1.07, G_1b, yerr=sigma_G1bpred, marker='D', capsize=4, color='white',  zorder=-1, linestyle='None', markeredgecolor='none', markersize=10)
+        plt.errorbar(x_1b*1.07, G_1b, yerr=sigma_G1bpred, marker='D', capsize=4, color=color_1b, zorder=-1, linestyle='None', markeredgecolor='none', markersize=10, alpha=0.5)
+        # model 2
+        # plt.errorbar(x_1b*1.14, G_1b, yerr=sig2, marker='^', capsize=4, color='white', zorder=-1, linestyle='None', markeredgecolor='none', markersize=10)
+        plt.errorbar(x_1b*1.14, G_1b, yerr=sigma_G1bpred, marker='^', capsize=4, color='white',    zorder=-1, linestyle='None', markeredgecolor='none', markersize=10)
+        plt.errorbar(x_1b*1.14, G_1b, yerr=sigma_G1bpred, marker='^', capsize=4, color=color_1b,   zorder=-1, linestyle='None', markeredgecolor='none', markersize=10, alpha=0.5)
+         # plt.errorbar(x_1b, Gpred1b, yerr=sigma_G1bpred, marker='*', color='k', markersize=13, capsize=3, alpha=0.5)
     plt.ylabel('\\textbf{G [pW/K]}', labelpad=15)
     plt.xlim(x_lim); plt.ylim(y_lim)
-    # plt.tick_params(axis='y', which='both', right=True)
     plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)   # turn x ticks off
     plt.yscale(ax_scale); plt.xscale(ax_scale)
     plt.grid(linestyle = '--', which='both', linewidth=0.5)
 
     # legend
-    lorder = [0, 1, 2]
+    lorder = [0, -1, 1, 2]
+    # lorder = [0, 1]
     handles, labels = ax1.get_legend_handles_labels()
     plt.legend([handles[idx] for idx in lorder],[labels[idx] for idx in lorder])
 
@@ -1323,12 +1368,13 @@ def predict_Glegacy_2models(sim_dict, plot_opts, legacy, bolotest={}, title='', 
     plt.axhline(0, color=color1, alpha=0.5)
     plt.fill_between((0, max(legacy_x)*5), -1, 1, facecolor=color1, alpha=0.2)   # +/- 1 sigma
     if plot_wgrad:   # color data points by width gradient
-        plt.scatter(legacy_x, normres, c=legacy_lw, cmap='viridis', s=80, vmin=vmin, vmax=vmax, edgecolor='none', alpha=0.5)
+        plt.scatter(legacy_x, normres, c=legacy_lw, cmap='viridis', s=90, vmin=vmin, vmax=vmax, edgecolor='none', alpha=0.5)
     else:
         plt.scatter(legacy_x, normres, color='k', s=80, facecolors='none', linewidths=1.5)
+    if plot_bolo1b: plt.scatter(x_1b, normres_1b,   color='red', s=90, marker='o', edgecolor='none', alpha=0.7)
     plt.xlim(ax_xlim)
     # plt.ylabel('Model 1', fontsize=16, labelpad=-7)
-    plt.ylabel('$L_{a,\\mathit{1}}$', fontsize=18, labelpad=-8)
+    plt.ylabel('$\ell_{\\mathit{1}}$', fontsize=18, labelpad=-8)
     plt.ylim(rylim)
     # plt.tick_params(axis='y', which='both', right=True)
     plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)   # turn x ticks off
@@ -1339,12 +1385,13 @@ def predict_Glegacy_2models(sim_dict, plot_opts, legacy, bolotest={}, title='', 
     plt.axhline(0, color=color2, alpha=0.5)
     plt.fill_between((0, max(legacy_x)*5), -1, 1, facecolor=color2, alpha=0.2)   # +/- 1 sigma
     if plot_wgrad:   # color data points by width gradient
-        plt.scatter(legacy_x, normres2, c=legacy_lw, cmap='viridis', s=80, vmin=vmin, vmax=vmax, edgecolor='none', alpha=0.5)
+        plt.scatter(legacy_x, normres2, c=legacy_lw, cmap='viridis', s=90, vmin=vmin, vmax=vmax, edgecolor='none', alpha=0.5)
     else:
         plt.scatter(legacy_x, normres2, color='k', s=80, facecolors='none', linewidths=1.5)
+    if plot_bolo1b: plt.scatter(x_1b, normres_1b,   color='red', s=90, marker='o', edgecolor='none', alpha=0.7)
     plt.xlabel(x_label); plt.xlim(ax_xlim)
     # plt.ylabel('Model 2', fontsize=16, labelpad=-7)
-    plt.ylabel('$L_{a,\\mathit{2}}$', fontsize=18, labelpad=-8)
+    plt.ylabel('$\ell_{\\mathit{2}}$', fontsize=18, labelpad=-8)
     plt.ylim(rylim)
     # plt.tick_params(axis='y', which='both', right=True)
     plt.grid(linestyle = '--', which='both', linewidth=0.5)
@@ -1359,7 +1406,7 @@ def predict_Glegacy_2models(sim_dict, plot_opts, legacy, bolotest={}, title='', 
 
     return legacy
 
-# acoustic length analysis
+### acoustic length analysis
 def Geff(Gb, L, La, d, da):
     # model L and d scaling in 3D diffuse to ballistic transition
     # G_diff = G_ball * La/L * d/da
