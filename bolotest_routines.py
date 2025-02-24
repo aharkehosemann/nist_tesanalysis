@@ -221,6 +221,18 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
         pLscale = copy.copy(bolo['geometry']['pLscale'])
         a_factor = (220/ll)**pLscale
 
+    # if np.isscalar(lw):
+    #     # w_isep   = w2w if lw>=w2w else lw
+    #     # w_istack = lw-w2w if lw>=w2w else 0
+    #     w_w2     = w2w if lw >= w2w else lw
+    #     w_w1     = w1w if lw >= w1w else lw
+    #     # w_w2      = w2w if lw >= w2w else lw
+    # else:
+    #     w_w2      = w2w*np.ones(len(lw)); w_w2[lw<w2w]   = lw[lw<w2w]
+    #     w_w1      = w1w*np.ones(len(lw)); w_w1[lw<w1w]   = lw[lw<w1w]
+    #     # w_isep    = w2w*np.ones(len(lw)); w_isep[lw<w2w] = lw[lw<w2w]
+    #     # w_istack  = lw - w_isep #; w2diff[wdiff<0] = 0
+
     if model=='Two-Layer':
 
         if legA:   # S-W1-I1-W2-I2
@@ -306,110 +318,84 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
 
     elif stack_I:   # allow for I1-I2 stacks, including between 3 and 5 um
 
+        # w_isep    = np.array(w_w2)
+        # w_istack  = np.array(lw - w_isep); w_istack[w_istack<0] = 0
+
+        # if np.isscalar(lw):
+        #     w_isep   = w2w if lw>=w2w else lw
+        #     w_istack = lw-w2w if lw>=w2w else 0
+        #     w_w1     = w1w if lw >= w1w else lw
+        #     w_w2      = w2w if lw >= w2w else lw
+        # else:
+        #     w_w1      = w1w*np.ones(len(lw)); w_w1[lw<w1w]   = lw[lw<w1w]
+        #     w_isep    = w2w*np.ones(len(lw)); w_isep[lw<w2w] = lw[lw<w2w]
+        #     w_istack  = lw - w_isep #; w2diff[wdiff<0] = 0
         if np.isscalar(lw):
-            w_isep   = w2w if lw>=w2w else lw
-            w_istack = lw-w2w if lw>=w2w else 0
-            w_w1      = w1w if lw >= w1w else lw
-            # w_w2      = w2w if lw >= w2w else lw
+            # w_isep   = w2w if lw>=w2w else lw
+            w_w2     = w2w    if lw > w2w else lw
+            w_w1     = w1w    if lw > w1w else lw
+            w_istack = lw-w2w if lw>w2w else 0
         else:
-            w_w1      = w1w*np.ones(len(lw)); w_w1[lw<w1w]   = lw[lw<w1w]
-            w_isep    = w2w*np.ones(len(lw)); w_isep[lw<w2w] = lw[lw<w2w]
-            w_istack  = lw - w_isep #; w2diff[wdiff<0] = 0
+            w_w2     = w2w*np.ones(len(lw)); w_w2[lw<w2w] = lw[lw<w2w]
+            w_w1     = w1w*np.ones(len(lw)); w_w1[lw<w1w] = lw[lw<w1w]
+            # w_istack = lw - w_isep #; w2diff[wdiff<0] = 0
+            w_istack = lw - w_w2; w_istack[lw<w2w] = 0
+
+        # pdb.set_trace()
 
         if legA:   # S-W1-I1-W2-I2
 
             G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5         * a_factor * include_S   # substrate still treated as separate layer
 
-            G_W1   = G_layer(fit, dW1, layer='W', model=model)     * (w_w1/5)      * a_factor * include_W
-            G_W2   = G_layer(fit, dW2, layer='W', model=model)     * (w_isep/5)      * a_factor * include_W
+            G_W2   = G_layer(fit, dW2, layer='W', model=model)     * (w_w2/5)     * a_factor * include_W
+            G_W1   = G_layer(fit, dW1, layer='W', model=model)     * (w_w1/5)     * a_factor * include_W
             G_W    = G_W1 + G_W2
 
-
-            G_I1   = G_layer(fit, dI1, layer='I', model=model)     * (w_isep/5)      * a_factor * include_I
-            G_I2   = G_layer(fit, dI2, layer='I', model=model)     * (w_isep/5)      * a_factor * include_I
+            # I1 and I2 are separate to W2 width; I1-I2 stacked beyond W2 width
+            G_I1   = G_layer(fit, dI1,     layer='I', model=model) * (w_w2/5)     * a_factor * include_I
+            G_I2   = G_layer(fit, dI2,     layer='I', model=model) * (w_w2/5)     * a_factor * include_I
             G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * (w_istack/5) * a_factor * include_I
             G_I    = G_I1 + G_I2 + G_I1I2
 
         elif legB:   # S-W1-I1-W2
-            # G_S    = G_layer(fit, dS, layer='S', model=model)  * lw/5    * a_factor * include_S   # substrate still treated as separate layer
 
-            # G_W1   = G_layer(fit, dW1, layer='W', model=model) * (w1w/5) * a_factor * include_W
-            # G_W2   = G_layer(fit, dW2, layer='W', model=model) * (w2w/5) * a_factor * include_W
-            # G_W    = G_W1 + G_W2
+            G_S    = G_layer(fit, dS, layer='S', model=model)  * lw/5     * a_factor * include_S   # substrate still treated as separate layer
 
-            # G_I1   = G_layer(fit, dI1, layer='I', model=model) * (w2w/5) * a_factor * include_I   # I1 is trimmed to W2 width
-            # G_I    = G_I1
-
-            # if np.isscalar(lw):
-            #     w_isep   = w2w if lw>=w2w else lw
-            #     w_istack = lw-w2w if lw>=w2w else 0
-            #     w_w1      = w1w if lw >= w1w else lw
-            #     # w_w2      = w2w if lw >= w2w else lw
-            # else:
-            #     w_w1      = w1w*np.ones(len(lw)); w_w1[lw<w1w]   = lw[lw<w1w]
-            #     w_isep    = w2w*np.ones(len(lw)); w_isep[lw<w2w] = lw[lw<w2w]
-            #     w_istack  = lw - w_isep #; w2diff[wdiff<0] = 0
-
-            G_S    = G_layer(fit, dS, layer='S', model=model)  * lw/5    * a_factor * include_S   # substrate still treated as separate layer
-
-            G_W1   = G_layer(fit, dW1, layer='W', model=model)     * (w_w1/5)     * a_factor * include_W
-            G_W2   = G_layer(fit, dW2, layer='W', model=model)     * (w_isep/5)   * a_factor * include_W
+            G_W2   = G_layer(fit, dW2, layer='W', model=model) * (w_w2/5) * a_factor * include_W
+            G_W1   = G_layer(fit, dW1, layer='W', model=model) * (w_w1/5) * a_factor * include_W
             G_W    = G_W1 + G_W2
 
-            # G_W1   = G_layer(fit, dW1, layer='W', model=model) * (w1w/5) * a_factor * include_W
-            # G_W2   = G_layer(fit, dW2, layer='W', model=model) * (w2w/5) * a_factor * include_W
-            # G_W    = G_W1 + G_W2
-
-
-            G_I1   = G_layer(fit, dI1, layer='I', model=model)     * (w_isep/5)   * a_factor * include_I
-            # G_I2   = G_layer(fit, dI2, layer='I', model=model)     * (w_isep/5)   * a_factor * include_I
-            # G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * (w_istack/5) * a_factor * include_I
+            # I1 is trimmed to W2 width
+            G_I1   = G_layer(fit, dI1, layer='I', model=model) * (w_w2/5) * a_factor * include_I
             G_I    = G_I1
 
-
-            # G_I1   = G_layer(fit, dI1, layer='I', model=model) * (w2w/5) * a_factor * include_I   # I1 is trimmed to W2 width
-            # G_I    = G_I1
         elif legC:   # S-I1-W2-I2
             G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5         * a_factor * include_S   # substrate still treated as separate layer
 
-            # G_W2   = G_layer(fit, dW2, layer='W', model=model) * (w2w/5)          * a_factor * include_W
-            G_W2   = G_layer(fit, dW2, layer='W', model=model)     * (w_isep/5)      * a_factor * include_W
+            G_W2   = G_layer(fit, dW2, layer='W', model=model)     * (w_w2/5)     * a_factor * include_W
             G_W    = G_W2
 
-            # G_I1   = G_layer(fit, dI1, layer='I', model=model)     * (w2w/5)      * a_factor * include_I
-            # G_I2   = G_layer(fit, dI2, layer='I', model=model)     * (w2w/5)      * a_factor * include_I
-            # G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * ((lw-w2w)/5) * a_factor * include_I
-            # G_I    = G_I1 + G_I2 + G_I1I2
-
-            G_I1   = G_layer(fit, dI1, layer='I', model=model)     * (w_isep/5)   * a_factor * include_I
-            G_I2   = G_layer(fit, dI2, layer='I', model=model)     * (w_isep/5)   * a_factor * include_I
+            # I1 and I2 are separate to W2 width; I1-I2 stacked beyond W2 width
+            G_I1   = G_layer(fit, dI1, layer='I', model=model)     * (w_w2/5)     * a_factor * include_I
+            G_I2   = G_layer(fit, dI2, layer='I', model=model)     * (w_w2/5)     * a_factor * include_I
             G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * (w_istack/5) * a_factor * include_I
             G_I    = G_I1 + G_I2 + G_I1I2
 
         elif legD:   # S-W1-I1-I2
-            # G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5         * a_factor * include_S   # substrate still treated as separate layer
-            G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5         * a_factor * include_S   # substrate still treated as separate layer
+            G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5   * a_factor * include_S   # substrate still treated as separate layer
 
-            # G_W1   = G_layer(fit, dW1, layer='W', model=model)     * (w1w/5)      * a_factor * include_W
-            # G_W    = G_W1
-
-            G_W1   = G_layer(fit, dW1, layer='W', model=model)     * (w_w1/5)      * a_factor * include_W
-            # G_W2   = G_layer(fit, dW2, layer='W', model=model)     * (w_isep/5)      * a_factor * include_W
+            G_W1   = G_layer(fit, dW1, layer='W', model=model)     * w_w1/5 * a_factor * include_W
             G_W    = G_W1
 
-            # G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * (lw/5)       * a_factor * include_I   # I1-I2 stack over whole leg
-            # G_I    = G_I1I2
-
-            # G_I1   = G_layer(fit, dI1, layer='I', model=model)     * (w_isep/5)      * a_factor * include_I
-            # G_I2   = G_layer(fit, dI2, layer='I', model=model)     * (w_isep/5)      * a_factor * include_I
-            G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * (lw/5) * a_factor * include_I
+            # I1-I2 stacked across entire leg
+            G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * lw/5    * a_factor * include_I
             G_I    = G_I1I2
 
         elif legE:   # S-W1-W2
-            G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5         * a_factor * include_S   # substrate still treated as separate layer
+            G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5    * a_factor * include_S   # substrate still treated as separate layer
 
-            # G_W1W2 = G_layer(fit, dW1+dW2, layer='W', model=model) * (w2w/5)      * a_factor * include_W   # W1-W2 stack is only 3 um wide
-            G_W1W2 = G_layer(fit, dW1+dW2, layer='W', model=model) * (w_isep/5)      * a_factor * include_W
+            # W1-W2 stack trimmed to W2 width
+            G_W1W2 = G_layer(fit, dW1+dW2, layer='W', model=model) * (w_w2/5) * a_factor * include_W
             G_W    = G_W1W2
 
             G_I    = 0
@@ -434,16 +420,6 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
         dOx = bolo['geometry']['dSiOx']*np.ones_like(dS)   # nm - thickness of oxide layer - shared with all film stacks
         dSiNx = dS-dOx
 
-        # if np.isscalar(lw):
-        #     w_isep   = w2w if lw>=w2w else lw
-        #     w_istack = lw-w2w if lw>=w2w else 0
-        #     w_w1      = w1w if lw >= w1w else lw
-        #     # w_w2      = w2w if lw >= w2w else lw
-        # else:
-        #     w_w1      = w1w*np.ones(len(lw)); w_w1[lw<w1w]   = lw[lw<w1w]
-        #     w_isep    = w2w*np.ones(len(lw)); w_isep[lw<w2w] = lw[lw<w2w]
-        #     w_istack  = lw - w_isep #; w2diff[wdiff<0] = 0
-
         # handle dsub < d_SiNx
         if np.isscalar(dSiNx):
             if (dSiNx < 0): dOx = dS; dSiNx = 0
@@ -451,260 +427,246 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             dOx[dSiNx < 0]   = dS[dSiNx < 0]
             dSiNx[dSiNx < 0] = 0
 
+        # if np.isscalar(lw):
+        #     w_isep   = w2w if lw >= w2w else lw
+        #     w_ssep   = w1w if lw >= w1w else lw
+        #     w_istack = np.min([w1w, lw]) - w2w if lw >= w2w else 0
+        #     w_sstack = lw-w1w if lw >= w1w else 0
         if np.isscalar(lw):
-            w_isep   = w2w if lw >= w2w else lw
-            w_ssep   = w1w if lw >= w1w else lw
-            w_istack = np.min([w1w, lw]) - w2w if lw >= w2w else 0
-            w_sstack = lw-w1w if lw >= w1w else 0
+            w_w2   = w2w if lw >= w2w else lw
+            w_w1   = w1w if lw >= w1w else lw
+            w_istack = w_w1 - w_w2 if lw >= w2w else 0
+            w_sstack = lw-w_w1 if lw >= w1w else 0
         else:
+            w_w2     = w2w*np.ones(len(lw)); w_w2[lw<w2w]   = lw[lw<w2w]
             w_w1     = w1w*np.ones(len(lw)); w_w1[lw<w1w]   = lw[lw<w1w]
-            w_ssep   = w_w1
-            w_isep   = w2w*np.ones(len(lw)); w_isep[lw<w2w] = lw[lw<w2w]
-            w_istack = w_ssep - w2w*np.ones(len(lw)); w_istack[lw<w2w] = 0
-            w_sstack = lw - w1w*np.ones(len(lw)); w_sstack[lw<w1w] = 0
+            w_istack = w_w1 - w_w2; w_istack[lw<w2w] = 0
+            w_sstack = lw   - w_w1; w_sstack[lw<w1w] = 0
 
         if legA:   # S-W1-I1-W2-I2
             # I1-I2 stack beyond W2 width, SiNx-I1-I2 stack beyond W1 width
 
-                # isep_inds = np.where(lw<=w2w)[0]
-                # w_isep    = w2w*np.ones(len(lw))
-                # w_isep[isep_inds] = lw[isep_inds]
-
-                # istack_inds = np.where((lw>w2w) & (lw<=w1w))[0]
-                # w_istack    = (w1w-w2w)*np.ones(len(lw))
-                # w_istack[istack_inds] = lw[istack_inds] - (w2w*np.ones(len(lw)))[istack_inds]
-                # w_istack[isep_inds] = 0   # stack I1-I2 and keep S separate between W1 and W2
-
-                # ssep_inds = np.where(lw<=w1w)[0]
-                # w_ssep    = w1w*np.ones(len(lw))
-                # w_ssep[ssep_inds] = lw[ssep_inds]
-
-                # w_sstack = lw - w1w*np.ones(len(lw))
-                # w_sstack[ssep_inds] = 0  # stack SiNx-I1-I2 and keep S separate between W1 and W2
-
-
-
-            # stack nitrides
-            # G_SiNx = G_layer(fit, dSiNx,   layer='I', model=model) * (w1w/5)       * a_factor * include_I   # 5 um
-            # G_I1   = G_layer(fit, dI1,     layer='I', model=model) * (w2w/5)       * a_factor * include_I   # 3 um
-            # G_I2   = G_layer(fit, dI2,     layer='I', model=model) * (w2w/5)       * a_factor * include_I   # 3 um
-            # G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * ((w1w-w2w)/5) * a_factor * include_I   # 3 to 5 um
-            # G_SiNxI1I2 = G_layer(fit, dSiNx+dI1+dI2, layer='I', model=model) * ((lw-w1w)/5) * a_factor * include_I   # rest of leg
-            # G_I    = G_SiNx + G_I1 + G_I2 + G_I1I2 + G_SiNxI1I2
-
-            # w_ssep     = w1w*np.ones(len(lw)); w_sep[lw<w1w] = lw[lw<w1w]
-            # w_istack  = lw - w_sep #; w2diff[wdiff<0] = 0
-
-            # G_SiNx = G_layer(fit, dSiNx,   layer='I', model=model) * (w1w/5)       * a_factor * include_I   # 5 um
-            # G_I1   = G_layer(fit, dI1,     layer='I', model=model) * (w2w/5)       * a_factor * include_I   # 3 um
-            # G_I2   = G_layer(fit, dI2,     layer='I', model=model) * (w2w/5)       * a_factor * include_I   # 3 um
-            # G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * ((w1w-w2w)/5) * a_factor * include_I   # 3 to 5 um
-            # G_SiNxI1I2 = G_layer(fit, dSiNx+dI1+dI2, layer='I', model=model) * ((lw-w1w)/5) * a_factor * include_I   # rest of leg
-            # G_I    = G_SiNx + G_I1 + G_I2 + G_I1I2 + G_SiNxI1I2
-
             G_S    = G_layer(fit, dOx, layer='S', model=model, dS0=0.400) * lw/5       * a_factor * include_S
 
-            G_W1   = G_layer(fit, dW1, layer='W', model=model)            * (w_ssep/5) * a_factor * include_W
-            G_W2   = G_layer(fit, dW2, layer='W', model=model)            * (w_isep/5) * a_factor * include_W
+            G_W1   = G_layer(fit, dW1, layer='W', model=model)   * (w_w1/5) * a_factor * include_W
+            G_W2   = G_layer(fit, dW2, layer='W', model=model)   * (w_w2/5) * a_factor * include_W
             G_W    = G_W1 + G_W2
 
-            # separate nitride layers
-            G_I1   = G_layer(fit, dI1,   layer='I', model=model) * (w_isep/5) * a_factor * include_I
-            G_I2   = G_layer(fit, dI2,   layer='I', model=model) * (w_isep/5) * a_factor * include_I
-            G_SiNx = G_layer(fit, dSiNx, layer='I', model=model) * (w_ssep/5) * a_factor * include_I
+            # separate nitride layers; I1 and I2 single layers for W2; SiNx separate layer for W1
+            G_I1   = G_layer(fit, dI1,   layer='I', model=model) * (w_w2/5) * a_factor * include_I
+            G_I2   = G_layer(fit, dI2,   layer='I', model=model) * (w_w2/5) * a_factor * include_I
+            G_SiNx = G_layer(fit, dSiNx, layer='I', model=model) * (w_w1/5) * a_factor * include_I
 
-            # stack nitrides
+            # stack nitrides; I1 and I2 stacked between W1 and W2; SiNx stacked after W1
             G_I1I2     = G_layer(fit, dI1+dI2,       layer='I', model=model) * (w_istack/5) * a_factor * include_I
             G_SiNxI1I2 = G_layer(fit, dSiNx+dI1+dI2, layer='I', model=model) * (w_sstack/5) * a_factor * include_I   # rest of leg
             G_I    = G_SiNx + G_I1 + G_I2 + G_I1I2 + G_SiNxI1I2
 
         elif legB:   # S-W1-I1-W2
-            # I1 is trimmed to W2 width, S and I1 never stack, no I2
             G_S    = G_layer(fit, dOx, layer='S', model=model, dS0=0.400) * lw/5       * a_factor * include_S
 
-            # G_W1   = G_layer(fit, dW1, layer='W', model=model) * (w1w/5)          * a_factor * include_W
-            # G_W2   = G_layer(fit, dW2, layer='W', model=model) * (w2w/5)          * a_factor * include_W
-            G_W1   = G_layer(fit, dW1, layer='W', model=model)            * (w_ssep/5) * a_factor * include_W
-            G_W2   = G_layer(fit, dW2, layer='W', model=model)            * (w_isep/5) * a_factor * include_W
+            G_W1   = G_layer(fit, dW1, layer='W', model=model) * (w_w1/5) * a_factor * include_W
+            G_W2   = G_layer(fit, dW2, layer='W', model=model) * (w_w2/5) * a_factor * include_W
             G_W    = G_W1 + G_W2
 
-            # G_SiNx = G_layer(fit, dSiNx, layer='I', model=model) * (w_isep/5)       * a_factor * include_I   # whole leg
-            # G_I1   = G_layer(fit, dI1, layer='I', model=model)   * (w2w/5)      * a_factor * include_I   # I1 is trimmed to W2 width, SiNx and I1 never stack
-            # separate nitride layers
-            G_I1   = G_layer(fit, dI1,   layer='I', model=model) * (w_isep/5) * a_factor * include_I
-            G_SiNx = G_layer(fit, dSiNx, layer='I', model=model) * (w_ssep/5) * a_factor * include_I
+            # I1 is trimmed to W2, SiNx and I1 never stack
+            G_I1   = G_layer(fit, dI1,   layer='I', model=model) * (w_w2/5) * a_factor * include_I
+            G_SiNx = G_layer(fit, dSiNx, layer='I', model=model) * (lw/5)   * a_factor * include_I
             G_I    = G_SiNx + G_I1
 
-            # stack nitrides
-            # G_I1I2     = G_layer(fit, dI1+dI2,       layer='I', model=model) * (w_istack/5) * a_factor * include_I
-            # G_SiNxI1I2 = G_layer(fit, dSiNx+dI1+dI2, layer='I', model=model) * (w_sstack/5) * a_factor * include_I   # rest of leg
-            # G_I    = G_SiNx + G_I1 + G_I2 + G_I1I2 + G_SiNxI1I2
-
         elif legC:   # S-I1-W2-I2
-            # SiNx-I1 stack to W2 width, SiNx-I1-I2 stack beyond W2 width
             G_S    = G_layer(fit, dOx, layer='S', model=model, dS0=0.400) * lw/5       * a_factor * include_S
 
-            G_W2   = G_layer(fit, dW2, layer='W', model=model) * (w2w/5)          * a_factor * include_W
+            # G_W2   = G_layer(fit, dW2, layer='W', model=model)            * (w2w/5)    * a_factor * include_W
+            # G_W    = G_W2
+            G_W2   = G_layer(fit, dW2, layer='W', model=model) * (w_w2/5) * a_factor * include_W
             G_W    = G_W2
-            G_W1   = G_layer(fit, dW1, layer='W', model=model)            * (w_ssep/5) * a_factor * include_W
-            G_W2   = G_layer(fit, dW2, layer='W', model=model)            * (w_isep/5) * a_factor * include_W
-            G_W    = G_W1 + G_W2
 
-            # G_SiNxI1   = G_layer(fit, dSiNx+dI1, layer='I', model=model)     * (w2w/5)      * a_factor * include_I
-            # G_I2       = G_layer(fit, dI2, layer='I', model=model)           * (w2w/5)      * a_factor * include_I
-            # G_SiNxI1I2 = G_layer(fit, dSiNx+dI1+dI2, layer='I', model=model) * ((lw-w2w)/5) * a_factor * include_I
-            G_I2   = G_layer(fit, dI2,   layer='I', model=model)             * (w_isep/5) * a_factor * include_I
-            G_SiNxI1   = G_layer(fit, dSiNx+dI1+dI2, layer='I', model=model) * (w_isep/5)                * a_factor * include_I   # rest of leg
+            # I2 separate to W2 width; SiNx-I1 stack to W2; SiNx-I1-I2 stack beyond W2 width
+            G_I2       = G_layer(fit, dI2,   layer='I', model=model)         * (w_w2/5) * a_factor * include_I
+            G_SiNxI1   = G_layer(fit, dSiNx+dI1, layer='I', model=model)     * (w_w2/5) * a_factor * include_I   # rest of leg
             G_SiNxI1I2 = G_layer(fit, dSiNx+dI1+dI2, layer='I', model=model) * ((w_istack + w_sstack)/5) * a_factor * include_I   # rest of leg
-            G_I    = G_I2 + G_SiNxI1 + G_SiNxI1I2
+            G_I        = G_I2 + G_SiNxI1 + G_SiNxI1I2
 
         elif legD:   # S-W1-I1-I2
-            # I1-I2 to W1 width, SiNx-I1-I2 stack beyond W1
-            G_S    = G_layer(fit, dOx, layer='S', model=model, dS0=0.400) * lw/5       * a_factor * include_S
+            G_S    = G_layer(fit, dOx, layer='S', model=model, dS0=0.400)    * lw/5     * a_factor * include_S
 
-            # G_W1   = G_layer(fit, dW1, layer='W', model=model)            * (w1w/5) * a_factor * include_W
-            G_W1   = G_layer(fit, dW1, layer='W', model=model)            * (w_ssep/5) * a_factor * include_W
+            G_W1   = G_layer(fit, dW1, layer='W', model=model)               * (w_w1/5) * a_factor * include_W
             G_W    = G_W1
 
-            # G_SiNx     = G_layer(fit, dSiNx, layer='I', model=model)         * (w1w/5)      * a_factor * include_I
-            # G_I1I2     = G_layer(fit, dI1+dI2, layer='I', model=model)       * (w1w/5)      * a_factor * include_I   # I1-I2 stack over whole leg
-            # G_SiNxI1I2 = G_layer(fit, dSiNx+dI1+dI2, layer='I', model=model) * ((lw-w1w)/5) * a_factor * include_I
-            G_SiNx = G_layer(fit, dSiNx, layer='I', model=model) * (w_ssep/5) * a_factor * include_I
-            G_I1I2     = G_layer(fit, dI1+dI2,       layer='I', model=model) * (w_ssep/5) * a_factor * include_I
+            # I1-I2 to W1 width, SiNx-I1-I2 stack beyond W1
+            G_SiNx     = G_layer(fit, dSiNx, layer='I', model=model)         * (w_w1/5)     * a_factor * include_I
+            G_I1I2     = G_layer(fit, dI1+dI2,       layer='I', model=model) * (w_w1/5)     * a_factor * include_I
             G_SiNxI1I2 = G_layer(fit, dSiNx+dI1+dI2, layer='I', model=model) * (w_sstack/5) * a_factor * include_I   # rest of leg
             G_I        = G_SiNx + G_I1I2 + G_SiNxI1I2
-
-            # # separate nitride layers
-            # G_I1   = G_layer(fit, dI1,   layer='I', model=model) * (w_isep/5) * a_factor * include_I
-            # G_I2   = G_layer(fit, dI2,   layer='I', model=model) * (w_isep/5) * a_factor * include_I
-
-            # # stack nitrides
-            # G_I    = G_SiNx + G_I1 + G_I2 + G_I1I2 + G_SiNxI1I2
 
         elif legE:   # S-W1-W2
             G_S    = G_layer(fit, dOx, layer='S', model=model, dS0=0.400) * lw/5       * a_factor * include_S
 
-            # G_W1W2 = G_layer(fit, dW1+dW2, layer='W', model=model) * (w2w/5)   * a_factor * include_W   # W1-W2 stack is only 3 um wide
-            G_W1W2   = G_layer(fit, dW1+dW2, layer='W', model=model)      * (w_isep/5) * a_factor * include_W
+            # W1-W2 stack trimmed to W2 width
+            G_W1W2 = G_layer(fit, dW1+dW2, layer='W', model=model)        * (w_w2/5) * a_factor * include_W
             G_W    = G_W1W2
 
-            # G_SiNx = G_layer(fit, dSiNx, layer='I', model=model)   * (lw/5)    * a_factor * include_I
             G_SiNx = G_layer(fit, dSiNx, layer='I', model=model) * (lw/5) * a_factor * include_I
             G_I    = G_SiNx
 
         elif legF:   # S-I1-I2
-            # SiNx-I1-I2 layer over whole leg
-            G_S    = G_layer(fit, dOx, layer='S', model=model, dS0=0.400) * lw/5       * a_factor * include_S
+            G_S        = G_layer(fit, dOx, layer='S', model=model, dS0=0.400) * lw/5       * a_factor * include_S
 
             G_W        = 0
 
-            # G_SiNxI1I2 = G_layer(fit, dSiNx+dI1+dI2, layer='I', model=model) * lw/5 * a_factor * include_I
-            G_SiNxI1I2 = G_layer(fit, dSiNx+dI1+dI2, layer='I', model=model) * (lw/5) * a_factor * include_I   # rest of leg
+            # SiNx-I1-I2 layer over whole leg
+            G_SiNxI1I2 = G_layer(fit, dSiNx+dI1+dI2, layer='I', model=model) * lw/5 * a_factor * include_I   # rest of leg
             G_I        = G_SiNxI1I2
 
         elif legG:   # S
-            G_S    = G_layer(fit, dOx, layer='S', model=model, dS0=0.400)   * lw/5      * a_factor * include_S   # substrate still treated as separate layer
+            G_S    = G_layer(fit, dOx, layer='S', model=model, dS0=0.400)    * lw/5 * a_factor * include_S   # substrate still treated as separate layer
 
             G_W    = 0
 
-            G_SiNx = G_layer(fit, dSiNx, layer='I', model=model) * (lw/5)    * a_factor * include_I
+            G_SiNx = G_layer(fit, dSiNx, layer='I', model=model)             * lw/5 * a_factor * include_I
             G_I    = G_SiNx
 
     else:   # no layer stacking unless explicit geometry
 
-        if np.isscalar(lw):
-            w_w2     = w2w if lw >= w2w else lw
-            w_isep   = w1w if lw>=w1w else lw
-            w_istack = lw-w1w if lw>=w1w else 0
-        else:
-            w_w2     = w2w*np.ones(len(lw)); w_w2[lw<w2w]   = lw[lw<w2w]
-            w_isep   = w1w*np.ones(len(lw)); w_isep[lw<w1w] = lw[lw<w1w]
-            w_istack = lw - w_isep #; w2diff[wdiff<0] = 0
+        # # start stacking I1 and I2 layers after W1 width
+        # if np.isscalar(lw):
+        #     w_w2     = w2w    if lw > w2w else lw
+        #     w_w1     = w1w    if lw > w1w else lw
+        #     w_istack = lw-w1w if lw>w1w else 0
+        # else:
+        #     w_w2     = w2w*np.ones(len(lw)); w_w2[lw<w2w] = lw[lw<w2w]
+        #     w_w1     = w1w*np.ones(len(lw)); w_w1[lw<w1w] = lw[lw<w1w]
+        #     w_istack = lw - w_w1; w_istack[lw<w1w] = 0
+
+        # # pdb.set_trace()
+
+        # if legA:   # S-W1-I1-W2-I2
+
+        #     G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5         * a_factor * include_S   # substrate still treated as separate layer
+
+        #     G_W1   = G_layer(fit, dW1, layer='W', model=model)     * (w_w1/5)     * a_factor * include_W
+        #     G_W2   = G_layer(fit, dW2, layer='W', model=model)     * (w_w2/5)     * a_factor * include_W
+        #     G_W    = G_W1 + G_W2
+
+        #     # I1 and I2 separate to W1 width, stacked beyond W1
+        #     G_I1   = G_layer(fit, dI1, layer='I', model=model)     * (w_w1/5)   * a_factor * include_I
+        #     G_I2   = G_layer(fit, dI2, layer='I', model=model)     * (w_w1/5)   * a_factor * include_I
+        #     G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * (w_istack/5) * a_factor * include_I
+        #     G_I    = G_I1 + G_I2 + G_I1I2
+
+        # elif legB:   # S-W1-I1-W2
+        #     G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5         * a_factor * include_S   # substrate still treated as separate layer
+
+        #     G_W1   = G_layer(fit, dW1, layer='W', model=model)     * (w_w1/5)      * a_factor * include_W
+        #     G_W2   = G_layer(fit, dW2, layer='W', model=model)     * (w_w2/5)      * a_factor * include_W
+        #     G_W    = G_W1 + G_W2
+
+        #     # I1 is trimmed to W2 width, no I2
+        #     G_I1   = G_layer(fit, dI1, layer='I', model=model)     * (w_w2/5)      * a_factor * include_I
+        #     G_I    = G_I1
+
+        # elif legC:   # S-I1-W2-I2
+        #     G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5         * a_factor * include_S   # substrate still treated as separate layer
+
+        #     G_W2   = G_layer(fit, dW2, layer='W', model=model)     * (w_w2/5)      * a_factor * include_W
+        #     G_W    = G_W2
+
+        #     # I1 and I2 separate to W1 width, stacked beyond W1
+        #     G_I1   = G_layer(fit, dI1,     layer='I', model=model) * (w_w1/5)     * a_factor * include_I
+        #     G_I2   = G_layer(fit, dI2,     layer='I', model=model) * (w_w1/5)     * a_factor * include_I
+        #     G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * (w_istack/5) * a_factor * include_I
+        #     G_I    = G_I1 + G_I2 + G_I1I2
+
+        # elif legD:   # S-W1-I1-I2
+        #     G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5     * a_factor * include_S   # substrate still treated as separate layer
+
+        #     G_W1   = G_layer(fit, dW1, layer='W', model=model)     * w_w1/5   * a_factor * include_W
+        #     G_W    = G_W1
+
+        #     G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * lw/5     * a_factor * include_I
+        #     G_I    = G_I1I2
+
+        # elif legE:   # S-W1-W2
+        #     G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5   * a_factor * include_S   # substrate still treated as separate layer
+
+        #     # W1-W2 stack trimmed to W2 width
+        #     G_W1W2 = G_layer(fit, dW1+dW2, layer='W', model=model) * w_w2/5 * a_factor * include_W   # W1-W2 stack is only 3 um wide
+        #     G_W    = G_W1W2
+
+        #     G_I    = 0
+
+        # elif legF:   # S-I1-I2
+        #     G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5 * a_factor * include_S   # substrate still treated as separate layer
+
+        #     G_W    = 0
+
+        #     # I1-I2 stack over whole leg
+        #     G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * lw/5 * a_factor * include_I
+        #     G_I    = G_I1I2
+
+        # elif legG:   # S
+        #     G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5 * a_factor * include_S   # substrate still treated as separate layer
+
+        #     G_W    = 0
+
+        #     G_I    = 0
 
         if legA:   # S-W1-I1-W2-I2
+            G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5    * a_factor * include_S   # substrate still treated as separate layer
 
-            G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5        * a_factor * include_S   # substrate still treated as separate layer
-
-            G_W1   = G_layer(fit, dW1, layer='W', model=model)     * (w_isep/5)    * a_factor * include_W
-            G_W2   = G_layer(fit, dW2, layer='W', model=model)     * (w_w2/5)      * a_factor * include_W
+            G_W1   = G_layer(fit, dW1, layer='W', model=model)     * (w1w/5)      * a_factor * include_W
+            G_W2   = G_layer(fit, dW2, layer='W', model=model)     * (w2w/5)      * a_factor * include_W
             G_W    = G_W1 + G_W2
 
-            G_I1   = G_layer(fit, dI1, layer='I', model=model)     * (w_isep/5)   * a_factor * include_I
-            G_I2   = G_layer(fit, dI2, layer='I', model=model)     * (w_isep/5)   * a_factor * include_I
-            G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * (w_istack/5) * a_factor * include_I
+            G_I1   = G_layer(fit, dI1, layer='I', model=model)     * (w1w/5)      * a_factor * include_I
+            G_I2   = G_layer(fit, dI2, layer='I', model=model)     * (w1w/5)      * a_factor * include_I
+            G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * ((lw-w1w)/5) * a_factor * include_I
             G_I    = G_I1 + G_I2 + G_I1I2
 
-            # G_W1   = G_layer(fit, dW1, layer='W', model=model)     * (w1w/5)     * a_factor * include_W
-            # G_W2   = G_layer(fit, dW2, layer='W', model=model)     * (w2w/5)     * a_factor * include_W
-            # G_W    = G_W1 + G_W2
-
-            # G_I1   = G_layer(fit, dI1, layer='I', model=model)     * (w1w/5)   * a_factor * include_I
-            # G_I2   = G_layer(fit, dI2, layer='I', model=model)     * (w1w/5)   * a_factor * include_I
-            # G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * ((lw-w1w)/5) * a_factor * include_I
-            # G_I    = G_I1 + G_I2 + G_I1I2
-
-            # G_I1   = G_layer(fit, dI1, layer='I', model=model)     * (w1w/5)      * a_factor * include_I
-            # G_I2   = G_layer(fit, dI2, layer='I', model=model)     * (w1w/5)      * a_factor * include_I
-            # G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * ((lw-w1w)/5) * a_factor * include_I
-            # G_I    = G_I1 + G_I2 + G_I1I2
-
         elif legB:   # S-W1-I1-W2
-            G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5         * a_factor * include_S   # substrate still treated as separate layer
-            # G_S    = G_layer(fit, dS+0.087, layer='S', model=model)      * lw/5         * a_factor * include_S   # substrate still treated as separate layer
+            G_S    = G_layer(fit, dS, layer='S', model=model)  * lw/5             * a_factor * include_S   # substrate still treated as separate layer
 
-            # G_W1   = G_layer(fit, dW1, layer='W', model=model) * (w1w/5)          * a_factor * include_W
-            # G_W2   = G_layer(fit, dW2, layer='W', model=model) * (w2w/5)          * a_factor * include_W
-            G_W1   = G_layer(fit, dW1, layer='W', model=model)     * (w_isep/5)      * a_factor * include_W
-            G_W2   = G_layer(fit, dW2, layer='W', model=model)     * (w_w2/5)      * a_factor * include_W
+            G_W1   = G_layer(fit, dW1, layer='W', model=model) * (w1w/5)          * a_factor * include_W
+            G_W2   = G_layer(fit, dW2, layer='W', model=model) * (w2w/5)          * a_factor * include_W
             G_W    = G_W1 + G_W2
 
-            # G_I1   = G_layer(fit, dI1, layer='I', model=model) * (w2w/5)          * a_factor * include_I   # I1 is trimmed to W2 width
-            G_I1   = G_layer(fit, dI1, layer='I', model=model)     * (w_w2/5)      * a_factor * include_I
+            G_I1   = G_layer(fit, dI1, layer='I', model=model) * (w2w/5)          * a_factor * include_I   # I1 is trimmed to W2 width
             G_I    = G_I1
 
         elif legC:   # S-I1-W2-I2
-            G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5         * a_factor * include_S   # substrate still treated as separate layer
+            G_S    = G_layer(fit, dS, layer='S', model=model)  * lw/5             * a_factor * include_S
 
-            # G_W2   = G_layer(fit, dW2, layer='W', model=model) * (w2w/5)          * a_factor * include_W
-            G_W2   = G_layer(fit, dW2, layer='W', model=model)     * (w_w2/5)      * a_factor * include_W
+            G_W2   = G_layer(fit, dW2, layer='W', model=model) * (w2w/5)          * a_factor * include_W
             G_W    = G_W2
 
-
-            # G_I1   = G_layer(fit, dI1, layer='I', model=model)     * (w1w/5)      * a_factor * include_I
-            # G_I2   = G_layer(fit, dI2, layer='I', model=model)     * (w1w/5)      * a_factor * include_I
-            # G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * ((lw-w1w)/5) * a_factor * include_I
-            G_I1   = G_layer(fit, dI1, layer='I', model=model)     * (w_isep/5)   * a_factor * include_I
-            G_I2   = G_layer(fit, dI2, layer='I', model=model)     * (w_isep/5)   * a_factor * include_I
-            G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * (w_istack/5) * a_factor * include_I
-            G_I    = G_I1 + G_I2 + G_I1I2
+            G_I1   = G_layer(fit, dI1, layer='I', model=model)     * (lw/5)      * a_factor * include_I
+            G_I2   = G_layer(fit, dI2, layer='I', model=model)     * (lw/5)      * a_factor * include_I
+            G_I    = G_I1 + G_I2
 
         elif legD:   # S-W1-I1-I2
             G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5         * a_factor * include_S   # substrate still treated as separate layer
 
-            # G_W1   = G_layer(fit, dW1, layer='W', model=model)     * (w1w/5)      * a_factor * include_W
-            G_W1   = G_layer(fit, dW1, layer='W', model=model)     * (w_isep/5)      * a_factor * include_W
+            G_W1   = G_layer(fit, dW1, layer='W', model=model)     * (w1w/5)      * a_factor * include_W
             G_W    = G_W1
 
-            G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * (lw/5) * a_factor * include_I
+            G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * (lw/5)       * a_factor * include_I   # I1-I2 stack over whole leg
             G_I    = G_I1I2
 
         elif legE:   # S-W1-W2
             G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5         * a_factor * include_S   # substrate still treated as separate layer
 
-            # refactor should be changed to W2!!
-            # G_W1W2 = G_layer(fit, dW1+dW2, layer='W', model=model) * (w2w/5)      * a_factor * include_W   # W1-W2 stack is only 3 um wide
-            G_W1W2 = G_layer(fit, dW1+dW2, layer='W', model=model) * (w_w2/5)      * a_factor * include_W   # W1-W2 stack is only 3 um wide
+            G_W1W2 = G_layer(fit, dW1+dW2, layer='W', model=model) * (w2w/5)      * a_factor * include_W   # W1-W2 stack is only 3 um wide
             G_W    = G_W1W2
 
             G_I    = 0
 
         elif legF:   # S-I1-I2
-            G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5         * a_factor * include_S   # substrate still treated as separate layer
+            G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5          * a_factor * include_S   # substrate still treated as separate layer
 
             G_W    = 0
 
-            # G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * lw/5          * a_factor * include_I
-            G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * (lw/5) * a_factor * include_I
+            G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * lw/5          * a_factor * include_I
             G_I    = G_I1I2
 
         elif legG:   # S
@@ -713,57 +675,6 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             G_W    = 0
 
             G_I    = 0
-
-    # G_W = (G_layer(fit, dW1, layer='W', model=model) * (w1w/5) + G_layer(fit, dW2, layer='W', model=model) * (w2w/5)**1.0 ) * a_factor * include_W
-
-    # ### handle nitride layers - separate vs stacked treatment
-    # G_S = G_layer(fit, dS, layer='S', model=model) * lw/5 * (1-supG*supG_width/5) * a_factor * include_S   # substrate still treated as separate layer
-    # G_I = ((G_layer(fit, dI1, layer='I', model=model) + G_layer(fit, dI2, layer='I', model=model) ) * w1w/5 + G_layer(fit, dI1 + dI2, layer='I', model=model)*(lw-w1w)/5) * a_factor * include_I   # G_I(w<W1) are summed, G_I(w>W1) is single I stack
-
-    # if legB:   # leg B only has 3 um wide layer of I1
-    #     G_S = G_layer(fit, dS, layer='S', model=model) * lw/5 * a_factor * (1-supG*supG_width/5) * include_S
-    #     G_I = G_layer(fit, dI1, layer='I', model=model) * 3/5 * a_factor * include_I
-    # elif legD or legF:
-    #     G_I = (G_layer(fit, dI1 + dI2, layer='I', model=model)*lw/5) * a_factor * include_I   # G_I(w<W1) are summed, G_I(w>W1) is single I stack
-
-    # elif stack_N:  # separate SiOx from substrate and stack all nitride layers
-    #     dOx = bolo['geometry']['dSiOx']*np.ones_like(dS)   # nm - thickness of oxide layer - shared with all film stacks
-    #     dSiNx = dS-dOx
-    #     if legB:   # leg B only has 3 um wide layer of I1
-    #         # G_S   = G_layer(fit, dOx, layer='S', model=model) * lw/5 * a_factor * (1-supG*supG_width/5) * include_S
-    #         G_SNx = G_layer(fit, dSiNx, layer='I', model=model) * lw/5 * (1-supG*supG_width/5) * a_factor * include_I   # substrate still treated as separate layer
-    #         # G_I   = G_SNx + G_layer(fit, dI1, layer='I', model=model) * 3/5 * a_factor * include_I
-    #     elif legC:   # I1-I2 stack begins at outside W1
-    #         G_S = G_layer(fit, dOx, layer='S', model=model) * lw/5 * (1-supG*supG_width/5) * a_factor * include_S   # substrate still treated as separate layer
-    #         G_I = ((G_layer(fit, dSiNx + dI1, layer='I', model=model) + G_layer(fit, dI2, layer='I', model=model) ) * w2w/5 + G_layer(fit, dSiNx + dI1 + dI2, layer='I', model=model)*(lw-w2w)/5) * a_factor * include_I   # G_I(w<W1) are summed, G_I(w>W1) is single I stack
-    #     elif legF:
-    #         G_S = G_layer(fit, dOx, layer='S', model=model) * lw/5 * (1-supG*supG_width/5) * a_factor * include_S   # substrate still treated as separate layer
-    #         G_I = ( G_layer(fit, dSiNx + dI1 + dI2, layer='I', model=model)*(lw)/5) * a_factor * include_I   # G_I(w<W1) are summed, G_I(w>W1) is single I stack
-    #     else:
-    #         G_S   = G_layer(fit, dOx,   layer='S', model=model) * lw/5 * (1-supG*supG_width/5) * a_factor * include_S   # substrate still treated as separate layer
-    #         G_SNx = G_layer(fit, dSiNx, layer='I', model=model) * w1w/5 * (1-supG*supG_width/5) * a_factor * include_I   # substrate still treated as separate layer
-    #         G_I   = ((G_layer(fit, dI1, layer='I', model=model) + G_layer(fit, dI2, layer='I', model=model) ) * w2w/5 + G_layer(fit, dI1 + dI2, layer='I', model=model)*(w1w-w2w)/5 + G_layer(fit, dSiNx + dI1 + dI2, layer='I', model=model)*(lw-w1w)/5) * a_factor * include_I + G_SNx   # G_I(w<W1) are summed, G_I(w>W1) is single I stack
-    # else:
-    #     G_S = G_layer(fit, dS, layer='S', model=model) * lw/5 * (1-supG*supG_width/5) * a_factor * include_S   # substrate still treated as separate layer
-    #     G_I = (G_layer(fit, dI1, layer='I', model=model) + G_layer(fit, dI2, layer='I', model=model)) * a_factor * include_I
-    # if legB:   # leg B only has 3 um wide layer of I1
-    #     G_W = (G_layer(fit, dW1, layer='W', model=model) * (w1w/5)**beta + G_layer(fit, dW2, layer='W', model=model) * (w2w/5)**beta ) * a_factor * include_W
-    #     G_S =  G_layer(fit, dS,  layer='S', model=model) * lw/5 * a_factor * (1-supG*supG_width/5) * include_S
-    #     G_I =  G_layer(fit, dI1, layer='I', model=model) * 3/5 * a_factor * include_I
-    # elif legE:   # allow for non-linear width scaling in leg E W layers
-    #     G_W = (G_layer(fit, dW2, layer='W', model=model) * (w2w/5)**beta ) * a_factor * include_W
-
-    # elif legC:   # I1-I2 stack begins at outside W1
-    #     G_S = G_layer(fit, dS, layer='S', model=model) * lw/5 * (1-supG*supG_width/5) * a_factor * include_S   # substrate still treated as separate layer
-    #     G_I = ((G_layer(fit, dI1, layer='I', model=model) + G_layer(fit, dI2, layer='I', model=model) ) * w2w/5 + G_layer(fit, dI1 + dI2, layer='I', model=model)*(lw-w2w)/5) * a_factor * include_I   # G_I(w<W1) are summed, G_I(w>W1) is single I stack
-    # elif legE:
-    #     G_W = (G_layer(fit, dW2, layer='W', model=model) * (w2w/5)**beta ) * a_factor * include_W
-    # elif legF:
-    #     G_W = (G_layer(fit, dW2, layer='W', model=model) * (w2w/5)**beta ) * a_factor * include_W
-
-    # elif model=='Two-Layer':
-    #     # G_S = G_layer(fit, dS, layer='S', model=model) * lw/5 * (220/ll)**Lscale * (1-supG*supG_width/5) * include_S   # substrate still treated as separate layer
-    #     # G_I = ( (G_layer(fit, dI1, layer='S', model=model) + G_layer(fit, dI2, layer='S', model=model)) * w2w/5 + G_layer(fit, dI1 + dI2, layer='I', model=model)*(lw-w2w)/5) * (220/ll)**Lscale * include_I   # G_I(w<W2) are summed, G_I(w>W2) is single I stack
 
 
     return G_S + G_W + G_I
@@ -1566,12 +1477,12 @@ def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,6)
     Gpred_W = np.median(GpredWs, axis=0); sigma_GpredW = np.std(GpredWs, axis=0)   # predictions and error [pW/K]
     Gpred_I = np.median(GpredIs, axis=0); sigma_GpredI = np.std(GpredIs, axis=0)   # predictions and error [pW/K]
 
-    if an_opts['stack_N']:
-        # bolo_SiNx = copy.deepcopy(legacy)
-        # bolo_SiNx['geometry']['layer_ds'][4:11] = np.zeros(7)
-        Gpreds_SiNx = Gfrommodel(sim_data, an_opts, legacy, layer='SiNx')
-        Gpred_SiNx = np.median(Gpreds_SiNx, axis=0)
-        Gpred_I = Gpred_I - Gpred_SiNx
+    # if an_opts['stack_N']:
+    #     # bolo_SiNx = copy.deepcopy(legacy)
+    #     # bolo_SiNx['geometry']['layer_ds'][4:11] = np.zeros(7)
+    #     Gpreds_SiNx = Gfrommodel(sim_data, an_opts, legacy, layer='SiNx')
+    #     Gpred_SiNx = np.median(Gpreds_SiNx, axis=0)
+    #     Gpred_I = Gpred_I - Gpred_SiNx
 
     m1lab = 'Model'
     # m1lab = 'Constrained Model'
@@ -1671,9 +1582,9 @@ def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,6)
     plt.plot(    legacy_x, Gpred_I, color='blueviolet', marker='s', markersize=5,  label='G$_\\text{I}$', linestyle='None', alpha=0.8)#, fillstyle='none', markeredgewidth=1.5)
     plt.plot(    legacy_x, Gpred_W, color='green',      marker='v', markersize=8,  label='G$_\\text{W}$', linestyle='None', alpha=0.8)#, fillstyle='none', markeredgewidth=1.5)
     lorder = [0, 1, 2, 3, 4]
-    if an_opts['stack_N']:
-        plt.plot(legacy_x, Gpred_SiNx, color='r', marker='s', markersize=5,  label='G$_\\text{SiNx}$', linestyle='None', alpha=0.8)#, fillstyle='none', markeredgewidth=1.5)
-        lorder = [0, 4, 1, 2, 3, 5]
+    # if an_opts['stack_N']:
+    #     plt.plot(legacy_x, Gpred_SiNx, color='r', marker='s', markersize=5,  label='G$_\\text{SiNx}$', linestyle='None', alpha=0.8)#, fillstyle='none', markeredgewidth=1.5)
+    #     lorder = [0, 4, 1, 2, 3, 5]
 
     plt.ylabel('\\textbf{G [pW/K]}')
     plt.xlim(x_lim)
@@ -1710,7 +1621,6 @@ def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,6)
         plt.scatter(legacy_x, normres,              color='darkorange', s=80, alpha=0.6)
         plt.fill_between((0, max(legacy_x)*5), -1, 1, facecolor='gray', alpha=0.5)   # +/- 1 sigma
     if plot_bolo1b: plt.scatter(x_1b, normres_1b,   color='red', s=80, marker='o', alpha=0.6)
-    if twomodels:   plt.scatter(legacy_x, normres2, color='blue', s=80, alpha=0.6, facecolors='none')
     plt.xlabel(x_label); plt.xlim(ax_xlim)
     plt.ylabel(rylab); plt.ylim(rylim)
     # plt.tick_params(axis='y', which='both', right=True)

@@ -235,7 +235,7 @@ class TESAnalyze():
             else: # don't include measurement error
                 pfit, pcov = curve_fit(fitfnct, Tbaths, powerAtRns[index], p0=init_guess)   # non-linear least squares fit, set absolute_sigma=True to get true variance in pcov
             perr = np.sqrt(np.diag(pcov))   # error of fit
-            # pdb.set_trace()
+
             # sort fit parameters
             if fitGexplicit:
                 GTcs[index] = pfit[0]; ns[index] = pfit[1]; Tcs[index] = pfit[2]   # fit parameters
