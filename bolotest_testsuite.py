@@ -180,7 +180,8 @@ def test_alphascaleI(verbose=False):
         assert GIN_lw_leg/GII_lw_leg == 1, "GIN_leg/GII_leg != 1 for w > w1w"
 
 def compare_output(fit, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0.200, dI1=0.400, dW2=0.350, dI2=0.400,
-                    manual_calc = False, plot_vwidth=False, lwrange=np.arange(5,40), plot_vdsub=False, dsrange=np.arange(0.400, 2.500)):
+                    manual_calc = False, plot_vwidth=False, lwrange=np.arange(5,40), plot_vdsub=False, dsrange=np.arange(0.400, 2.500),
+                    verbose=False):
     # calculate G manually and compare with function output
     # compare output between no nitride stacking, I-layer stacking, and nitride stacking
 
@@ -194,14 +195,16 @@ def compare_output(fit, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1
         GW0  = G_leg(fit, anopts0, bolo0, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=True)
         GI0  = G_leg(fit, anopts0, bolo0, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=True)
         G0   = G_leg(fit, anopts0, bolo0, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=True)
-        print('G_S no stack estimate difference: {} %'.format(round((GS0-GS00)/GS00*100, 1))); print('\n')
+        if verbose: print('G_S no stack estimate difference: {} %'.format(round((GS0-GS00)/GS00*100, 1))); print('\n')
+        assert (GS0-GS00)/GS00 == 1, "GS0_leg/GS0_calc != 1"
 
         GSI0 = fit[0]*(dsub/0.400)**(fit[3]+1)*lw/5
         GSI  = G_leg(fit, anoptsI, boloI, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=True)
         GWI  = G_leg(fit, anoptsI, boloI, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=True)
         GII  = G_leg(fit, anoptsI, boloI, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=True)
         GI   = G_leg(fit, anoptsI, boloI, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=True)
-        print('G_S I-layer stack estimate difference: {} %'.format(round((GSI-GSI0)/GSI0*100, 1))); print('\n')
+        if verbose: print('G_S I-layer stack estimate difference: {} %'.format(round((GSI-GSI0)/GSI0*100, 1))); print('\n')
+        assert (GSI-GSI0)/GSI0 == 1, "GSI_leg/GSI_calc != 1"
 
         GSN0 = fit[0] * (dSiOx/0.400)**(fit[3]+1) * lw/5
 
@@ -229,22 +232,28 @@ def compare_output(fit, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1
         # just S nitride
         boloSiNx, anoptsSiNx = test_objs(stack_N=True, lw=lw, ll=ll, dI1=0, dI2=0, dW1=0, dW2=0, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx)
         GSiNx0 = fit[2] * (dSiNx/0.400)**(fit[5]+1) * lw/5
-        G_SiNx = G_bolotest(fit, anoptsSiNx, boloSiNx, layer='I')[0]/4
-        G_SiNx = G_leg(fit, anoptsSiNx, boloSiNx, dsub, 0, 0, 0, 0, 0, 0, 1, legA=True)
+        GSiNx_bt = G_bolotest(fit, anoptsSiNx, boloSiNx, layer='I')[0]/4
+        GSiNx = G_leg(fit, anoptsSiNx, boloSiNx, dsub, 0, 0, 0, 0, 0, 0, 1, legA=True)
 
-        print('G_S nitride stack estimate difference    = {} %'.format(round(GSN-GSN0)/GSN0*100, 1))
-        print('G_I nitride stack estimate difference    = {} %'.format(round(GIN-GIN0)/GIN0*100, 1))
-        print('G_SiNx nitride stack estimate difference = {} %'.format(round(G_SiNx-GSiNx0)/GSiNx0*100, 1))
-        print('G_SiNx nitride is = {} % of GI'.format(round(G_SiNx/GIN*100, 1)))
-        print('SiNx nitride d is = {} % of total nitride d'.format(round(dSiNx/(dSiNx+dI1+dI2)*100, 1))); print('\n')
+        if verbose:
+            print('G_S nitride stack estimate difference    = {} %'.format(round(GSN-GSN0)/GSN0*100, 1))
+            print('G_I nitride stack estimate difference    = {} %'.format(round(GIN-GIN0)/GIN0*100, 1))
+            print('G_SiNx nitride stack estimate difference = {} %'.format(round(GSiNx-GSiNx0)/GSiNx0*100, 1))
+            print('G_SiNx nitride is = {} % of GI'.format(round(GSiNx/GIN*100, 1)))
+            print('SiNx nitride d is = {} % of total nitride d'.format(round(dSiNx/(dSiNx+dI1+dI2)*100, 1))); print('\n')
 
-        # print('G_SiNx nitride stack bolotest output difference = {} %'.format(round(GSN_bt-GSiNx0)/GSiNx0*100, 1))
-        print('G_SiNx nitride stack bolotest output difference = {} %'.format(round(GSN_bt-GSN)/GSN*100, 1))
-        print('G_I nitride stack bolotest output difference    = {} %'.format(round(GIN_bt-GIN0)/GIN0*100, 1)); print('\n')
+            print('G_SiNx nitride stack bolotest output difference = {} %'.format(round(GSiNx_bt-GSiNx0)/GSN*100, 1))
+            print('G_I nitride stack bolotest output difference    = {} %'.format(round(GIN_bt-GIN0)/GIN0*100, 1)); print('\n')
 
-        print('G(I Stacks) > G(No Stacks) = {}'.format(GI > G0))
-        print('G(N Stacks) > G(No Stacks) = {}'.format(GN > G0))
-        print('G(N Stacks) > G(I Stacks)  = {}'.format(GN > GI))
+            print('G(I Stacks) > G(No Stacks) = {}'.format(GI > G0))
+            print('G(N Stacks) > G(No Stacks) = {}'.format(GN > G0))
+            print('G(N Stacks) > G(I Stacks)  = {}'.format(GN > GI))
+        assert (GSN-GSN0)/GSN0          == 1, "GSN_leg/GSN_calc != 1"
+        assert (GSiNx-GSiNx0)/GSiNx0    == 1, "GSiNx_leg/GSiNx_calc != 1"
+        assert (GSiNx_bt-GSiNx0)/GSiNx0 == 1, "GSiNx_bt/GSiNx_calc != 1"
+        assert (GIN-GIN0)/GIN0          == 1, "GIN_leg/GIN_calc != 1"
+        assert (GIN_bt-GIN0)/GIN0       == 1, "GIN_bt/GIN_calc != 1"
+        print('\nG_leg() and G_bolotest() output matches manual calculations \n')
 
     if plot_vwidth:
 
