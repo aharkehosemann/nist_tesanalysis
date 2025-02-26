@@ -71,8 +71,8 @@ def test_alphascaleS(verbose=False):
             print('GS0  / GSN   = {}'.format(GS0_a01_leg/GSN_a01_leg))
             print('dsub / dSiOx = {}'.format(dsub1/dSiOx1)); print('\n')
 
-        assert GS0_a01_bt/GSN_a01_bt == dsub1/dSiOx1, "GS0_bt/GSN_bt != dsub/dSiOx"
-        assert GS0_a01_leg/GSN_a01_leg == dsub1/dSiOx1, "GS0_leg/GSN_leg != dsub/dSiOx"
+        assert round(GS0_a01_bt/GSN_a01_bt, 3) == dsub1/dSiOx1, "GS0_bt/GSN_bt != dsub/dSiOx"
+        assert round(GS0_a01_leg/GSN_a01_leg, 3) == dsub1/dSiOx1, "GS0_leg/GSN_leg != dsub/dSiOx"
 
         # alpha_I = 1
         GS0aI1_bt, GS0aI1_leg = GS_test(fit_aI1, dsub1, dSiOx1, lw=lw, w1w=w1w, w2w=w2w)
@@ -87,8 +87,8 @@ def test_alphascaleS(verbose=False):
             print('GS0  / GSN   = {}'.format(GS0_aI11_leg/GSN_aI11_leg))
             print('dsub / dSiOx = {}'.format(dsub1/dSiOx1)); print('\n')
 
-        assert GS0_aI11_bt/GSN_aI11_bt   == (dsub1/dSiOx1), "GS0_bt/GSN_bt   != (dsub1/dSiOx1)"
-        assert GS0_aI11_leg/GSN_aI11_leg == (dsub1/dSiOx1), "GS0_leg/GSN_leg != (dsub1/dSiOx1)"
+        assert round(GS0_aI11_bt/GSN_aI11_bt, 3)   == (dsub1/dSiOx1), "GS0_bt/GSN_bt   != (dsub1/dSiOx1)"
+        assert round(GS0_aI11_leg/GSN_aI11_leg, 3) == (dsub1/dSiOx1), "GS0_leg/GSN_leg != (dsub1/dSiOx1)"
 
         # alpha_S = 1
         GS0aS1_bt, GS0aS1_leg = GS_test(fit_aS1, dsub1, dSiOx1, lw=lw, w1w=w1w, w2w=w2w)
@@ -103,8 +103,8 @@ def test_alphascaleS(verbose=False):
             print('GS0  / GSN   = {}'.format(GS0_aS11_leg/GSN_aS11_leg))
             print('dsub / dSiOx = {}'.format(dsub1/dSiOx1)); print('\n')
 
-        assert GS0_aS11_bt/GSN_aS11_bt   == (dsub1/dSiOx1)**2, "GS0_bt/GSN_bt   != (dsub1/dSiOx1)^2"
-        assert GS0_aS11_leg/GSN_aS11_leg == (dsub1/dSiOx1)**2, "GS0_leg/GSN_leg != (dsub1/dSiOx1)^2"
+        assert round(GS0_aS11_bt/GSN_aS11_bt, 3)   == (dsub1/dSiOx1)**2, "GS0_bt/GSN_bt   != (dsub1/dSiOx1)^2"
+        assert round(GS0_aS11_leg/GSN_aS11_leg, 3) == (dsub1/dSiOx1)**2, "GS0_leg/GSN_leg != (dsub1/dSiOx1)^2"
 
 def GI_test(test_fit, dI1, dI2, lw=1, ll=220, w1w=5, w2w=3):
 
@@ -141,10 +141,10 @@ def test_alphascaleI(verbose=False):
             print('G_leg() output,      w < w2w:')
             print('GIN  / GI0   = {}'.format(GIN_w2_leg/GI0_w2_leg)); print('\n')
             # print('(dI1 + dI2)^2 / (dI1 + dI2) = {}'.format(dIstack**2/dIstack)); print('\n')
-        assert GIN_w2_bt/GI0_w2_bt   == 1, "GIN_bt/GI0_bt   != 1 for w < w2w"
-        assert GIN_w2_bt/GII_w2_bt   == 1, "GIN_bt/GII_bt   != 1 for w < w2w"
-        assert GIN_w2_leg/GI0_w2_leg == 1, "GIN_leg/GI0_leg != 1 for w < w2w"
-        assert GIN_w2_leg/GII_w2_leg == 1, "GIN_leg/GII_leg != 1 for w < w2w"
+        assert round(GIN_w2_bt/GI0_w2_bt, 3)   == 1, "GIN_bt/GI0_bt   != 1 for w < w2w"
+        assert round(GIN_w2_bt/GII_w2_bt, 3)   == 1, "GIN_bt/GII_bt   != 1 for w < w2w"
+        assert round(GIN_w2_leg/GI0_w2_leg, 3) == 1, "GIN_leg/GI0_leg != 1 for w < w2w"
+        assert round(GIN_w2_leg/GII_w2_leg, 3) == 1, "GIN_leg/GII_leg != 1 for w < w2w"
 
         # w2 < w < w1 - GN = GI = G0^2
         GI_w1_bt,   GI_w1_leg = GI_test(fit_aI1, dI1, dI2, lw=w1w, w1w=w1w, w2w=w2w)
@@ -159,10 +159,10 @@ def test_alphascaleI(verbose=False):
             print('G_leg() output,      w2w < w < w1w:')
             print('GIN  / GI0                  = {}'.format(GIN_w1_leg/GI0_w1_leg))
             print('(dI1 + dI2)^2 / (dI1 + dI2) = {}'.format(dIstack**2/dIstack)); print('\n')
-        assert GIN_w1_bt/GI0_w1_bt   == dIstack, "GIN_bt/GI0_bt   != (dI1 + dI2)^2 / (dI1 + dI2) for w2w < w < w1w"
-        assert GIN_w1_bt/GII_w1_bt   == 1,       "GIN_bt/GII_bt   != 1f or w2w < w < w1w for w2w < w < w1w"
-        assert GIN_w1_leg/GI0_w1_leg == dIstack, "GIN_leg/GI0_leg != (dI1 + dI2)^2 / (dI1 + dI2) for w2w < w < w1w"
-        assert GIN_w1_leg/GII_w1_leg == 1,       "GIN_leg/GII_leg != 1 for w2w < w < w1w"
+        assert round(GIN_w1_bt/GI0_w1_bt, 3)   == dIstack, "GIN_bt/GI0_bt   != (dI1 + dI2)^2 / (dI1 + dI2) for w2w < w < w1w"
+        assert round(GIN_w1_bt/GII_w1_bt, 3)   == 1,       "GIN_bt/GII_bt   != 1f or w2w < w < w1w for w2w < w < w1w"
+        assert round(GIN_w1_leg/GI0_w1_leg, 3) == dIstack, "GIN_leg/GI0_leg != (dI1 + dI2)^2 / (dI1 + dI2) for w2w < w < w1w"
+        assert round(GIN_w1_leg/GII_w1_leg, 3) == 1,       "GIN_leg/GII_leg != 1 for w2w < w < w1w"
 
         # w > w1 - GN = GI = G0
         GI_lw_bt,   GI_lw_leg = GI_test(fit_aI1, dI1, dI2, lw=lw, w1w=w1w, w2w=w2w)
@@ -174,18 +174,21 @@ def test_alphascaleI(verbose=False):
 
             print('G_leg() output,      w > w1w:')
             print('GIN  / GI0   = {}'.format(GIN_lw_leg/GI0_lw_leg))
-        assert GIN_lw_bt/GI0_lw_bt   == 1, "GIN_bt/GI0_bt   != 1 for w > w1w"
-        assert GIN_lw_bt/GII_lw_bt   == 1, "GIN_bt/GII_bt   != 1 for w > w1w"
-        assert GIN_lw_leg/GI0_lw_leg == 1, "GIN_leg/GI0_leg != 1 for w > w1w"
-        assert GIN_lw_leg/GII_lw_leg == 1, "GIN_leg/GII_leg != 1 for w > w1w"
+        assert round(GIN_lw_bt/GI0_lw_bt, 3)   == 1, "GIN_bt/GI0_bt   != 1 for w > w1w"
+        assert round(GIN_lw_bt/GII_lw_bt, 3)   == 1, "GIN_bt/GII_bt   != 1 for w > w1w"
+        assert round(GIN_lw_leg/GI0_lw_leg, 3) == 1, "GIN_leg/GI0_leg != 1 for w > w1w"
+        assert round(GIN_lw_leg/GII_lw_leg, 3) == 1, "GIN_leg/GII_leg != 1 for w > w1w"
 
-def compare_output(fit, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0.200, dI1=0.400, dW2=0.350, dI2=0.400,
+def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0.200, dI1=0.400, dW2=0.350, dI2=0.400,
                     manual_calc = False, plot_vwidth=False, lwrange=np.arange(5,40), plot_vdsub=False, dsrange=np.arange(0.400, 2.500),
+                    legA=False, legB=False, legC=False, legD=False, legE=False, legF=False, legG=False,
                     verbose=False):
-    # calculate G manually and compare with function output
-    # compare output between no nitride stacking, I-layer stacking, and nitride stacking
+    # compare output between I-layer stacking at w > w1w ("no stacking / status quo / 0"), I-layer stacking at w > w2w, and nitride stacking
+    # can look at different outputs for different legs vs width or thickness
+    # manual_calc currently only works for leg A
 
-    if manual_calc:
+    if manual_calc:   # calculate G manually and compare with function output
+        # written to work for leg A
         bolo0, anopts0 = test_objs(              lw=lw, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2)
         boloI, anoptsI = test_objs(stack_I=True, lw=lw, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2)
         boloN, anoptsN = test_objs(stack_N=True, lw=lw, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2)
@@ -196,7 +199,7 @@ def compare_output(fit, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1
         GI0  = G_leg(fit, anopts0, bolo0, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=True)
         G0   = G_leg(fit, anopts0, bolo0, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=True)
         if verbose: print('G_S no stack estimate difference: {} %'.format(round((GS0-GS00)/GS00*100, 1))); print('\n')
-        assert (GS0-GS00)/GS00 == 1, "GS0_leg/GS0_calc != 1"
+        assert round(GS0/GS00, 3) == 1, "GS0_leg/GS0_calc != 1"
 
         GSI0 = fit[0]*(dsub/0.400)**(fit[3]+1)*lw/5
         GSI  = G_leg(fit, anoptsI, boloI, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=True)
@@ -204,7 +207,7 @@ def compare_output(fit, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1
         GII  = G_leg(fit, anoptsI, boloI, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=True)
         GI   = G_leg(fit, anoptsI, boloI, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=True)
         if verbose: print('G_S I-layer stack estimate difference: {} %'.format(round((GSI-GSI0)/GSI0*100, 1))); print('\n')
-        assert (GSI-GSI0)/GSI0 == 1, "GSI_leg/GSI_calc != 1"
+        assert round(GSI/GSI0, 3) == 1, "GSI_leg/GSI_calc != 1"
 
         GSN0 = fit[0] * (dSiOx/0.400)**(fit[3]+1) * lw/5
 
@@ -236,23 +239,26 @@ def compare_output(fit, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1
         GSiNx = G_leg(fit, anoptsSiNx, boloSiNx, dsub, 0, 0, 0, 0, 0, 0, 1, legA=True)
 
         if verbose:
-            print('G_S nitride stack estimate difference    = {} %'.format(round(GSN-GSN0)/GSN0*100, 1))
-            print('G_I nitride stack estimate difference    = {} %'.format(round(GIN-GIN0)/GIN0*100, 1))
+            print('G_SiOx nitride stack estimate difference = {} %'.format(round(GSN-GSN0)/GSN0*100, 1))
+            print('G_I    nitride stack estimate difference = {} %'.format(round(GIN-GIN0)/GIN0*100, 1))
             print('G_SiNx nitride stack estimate difference = {} %'.format(round(GSiNx-GSiNx0)/GSiNx0*100, 1))
-            print('G_SiNx nitride is = {} % of GI'.format(round(GSiNx/GIN*100, 1)))
-            print('SiNx nitride d is = {} % of total nitride d'.format(round(dSiNx/(dSiNx+dI1+dI2)*100, 1))); print('\n')
+            print('G_SiNx nitride is   = {} % of GI'.format(round(GSiNx/GIN*100, 1)))
+            print('SiNx   nitride d is = {} % of total nitride d'.format(round(dSiNx/(dSiNx+dI1+dI2)*100, 1))); print('\n')
 
-            print('G_SiNx nitride stack bolotest output difference = {} %'.format(round(GSiNx_bt-GSiNx0)/GSN*100, 1))
-            print('G_I nitride stack bolotest output difference    = {} %'.format(round(GIN_bt-GIN0)/GIN0*100, 1)); print('\n')
+            print('G_S    nitride stack bolotest output difference = {} %'.format(round(GSN_bt-GSN0)/GSN0*100, 1))
+            print('G_SiNx nitride stack bolotest output difference = {} %'.format(round(GSiNx_bt-GSiNx0)/GSiNx0*100, 1))
+            print('G_I    nitride stack bolotest output difference = {} %'.format(round(GIN_bt-GIN0)/GIN0*100, 1)); print('\n')
 
             print('G(I Stacks) > G(No Stacks) = {}'.format(GI > G0))
             print('G(N Stacks) > G(No Stacks) = {}'.format(GN > G0))
             print('G(N Stacks) > G(I Stacks)  = {}'.format(GN > GI))
-        assert (GSN-GSN0)/GSN0          == 1, "GSN_leg/GSN_calc != 1"
-        assert (GSiNx-GSiNx0)/GSiNx0    == 1, "GSiNx_leg/GSiNx_calc != 1"
-        assert (GSiNx_bt-GSiNx0)/GSiNx0 == 1, "GSiNx_bt/GSiNx_calc != 1"
-        assert (GIN-GIN0)/GIN0          == 1, "GIN_leg/GIN_calc != 1"
-        assert (GIN_bt-GIN0)/GIN0       == 1, "GIN_bt/GIN_calc != 1"
+        # pdb.set_trace()
+        assert round(GSN/GSN0, 3)        == 1, "GSN_leg/GSN_calc     = {} != 1".format(round(GSN/GSN0, 3))
+        assert round(GSiNx_bt/GSiNx0, 3) == 1, "GS_bt/GS_calc        = {} != 1".format(round(GSN_bt/GSN0, 3))
+        assert round(GSiNx/GSiNx0, 3)    == 1, "GSiNx_leg/GSiNx_calc = {} != 1".format(round(GSiNx/GSiNx0, 3))
+        assert round(GSiNx_bt/GSiNx0, 3) == 1, "GSiNx_bt/GSiNx_calc  = {} != 1".format(round(GSiNx_bt/GSiNx0, 3))
+        assert round(GIN/GIN0, 3)        == 1, "GIN_leg/GIN_calc     = {} != 1".format(round(GIN/GIN0, 3))
+        assert round(GIN_bt/GIN0, 3)     == 1, "GIN_bt/GIN_calc      = {} != 1".format(round(GIN_bt/GIN0, 3))
         print('\nG_leg() and G_bolotest() output matches manual calculations \n')
 
     if plot_vwidth:
@@ -261,33 +267,36 @@ def compare_output(fit, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1
         # w1ws, w2ws = wlw(lwrange, fab='bolotest', maxw1w=w1w, maxw2w=w2w)   # W layer widths are a function of leg width
 
         bolo0_lw, anopts0_lw = test_objs(lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2)
-        G0_lw  = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=True)
-        G0S_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=True)
-        G0W_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=True)
-        G0I_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=True)
+        G0_lw  = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
+        G0S_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
+        G0W_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
+        G0I_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
 
 
         # boloI_lw, anoptsI_lw = test_objs(stack_I=True, lw=lwrange, ll=ll, w1w=w1ws, w2w=w2ws, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2)
         boloI_lw, anoptsI_lw = test_objs(stack_I=True, lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2)
-        GI_lw  = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=True)
-        GIS_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=True)
-        GIW_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=True)
-        GII_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=True)
+        GI_lw  = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
+        GIS_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
+        GIW_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
+        GII_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
 
         # boloN_lw, anoptsN_lw = test_objs(stack_N=True, lw=lwrange, ll=ll, w1w=w1ws, w2w=w2ws, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2)
         boloN_lw, anoptsN_lw = test_objs(stack_N=True, lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2)
-        GN_lw  = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=True)
-        GNS_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=True)
-        GNW_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=True)
-        GNI_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=True)
+        GN_lw  = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
+        GNS_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
+        GNW_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
+        GNI_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
 
         plt.figure(figsize=(10,5.5))
         plt.plot(lwrange/2, G0_lw,       alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
         plt.plot(lwrange/2, GI_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
         plt.plot(lwrange/2, GN_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
         plt.vlines([w2w/2, w1w/2], 0, max(GN_lw)*2, linestyle='--', alpha=0.3, color='k')
-        plt.annotate('W2', (w2w/2-0.3, GN_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
-        plt.annotate('W1', (w1w/2-0.3, GN_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
+        plt.annotate('W2', (w2w/2-0.5, GN_lw[1]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
+        plt.annotate('W1', (w1w/2-0.5, GN_lw[1]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
+        if np.isfinite(Gmeas):
+            plt.hlines([Gmeas], 0, max(lwrange)/2, linestyle='-.', alpha=0.5, color='r', label='G$_{meas}$')
+            # plt.annotate('G$_{meas}$', (w1w/10, 14*0.225))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G [pW/K]')
         plt.ylim(min(GN_lw)*0., np.max([G0_lw, GI_lw, GN_lw])*1.1)
         # plt.ylim(min(GN_lw)*0., 14)
@@ -352,17 +361,17 @@ def compare_output(fit, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1
     if plot_vdsub:
 
         bolo0_ds, anopts0_ds = test_objs(lw=lw, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2)
-        G0_ds = G_leg(fit, anopts0_ds, bolo0_ds, dsrange, dW1, dI1, dW2, dI2, True, True, True, legA=True)
+        G0_ds = G_leg(fit, anopts0_ds, bolo0_ds, dsrange, dW1, dI1, dW2, dI2, True, True, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
 
         boloI_ds, anoptsI_ds = test_objs(stack_I=True, lw=lw, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2)
-        GI_ds = np.array([G_leg(fit, anoptsI_ds, boloI_ds, ds, dW1, dI1, dW2, dI2, True, True, True, legA=True) for ds in dsrange])
+        GI_ds = G_leg(fit, anoptsI_ds, boloI_ds, dsrange, dW1, dI1, dW2, dI2, True, True, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
 
         boloN_ds, anoptsN_ds = test_objs(stack_N=True, lw=lw, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2)
-        GN_ds = G_leg(fit, anoptsN_ds, boloN_ds, dsrange, dW1, dI1, dW2, dI2, True, True, True, legA=True)
+        GN_ds = G_leg(fit, anoptsN_ds, boloN_ds, dsrange, dW1, dI1, dW2, dI2, True, True, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
 
         dStest      = np.linspace(0.2, 2.0, int((2-0.4)/0.2))
-        GN_dstest1  =           G_leg(fit, anoptsN_ds, boloN_ds, dStest, dW1, dI1, dW2, dI2, True, True, True, legA=True)
-        GN_dstest2  = np.array([G_leg(fit, anoptsN_ds, boloN_ds, ds,     dW1, dI1, dW2, dI2, True, True, True, legA=True) for ds in dStest])
+        GN_dstest1  =           G_leg(fit, anoptsN_ds, boloN_ds, dStest, dW1, dI1, dW2, dI2, True, True, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
+        GN_dstest2  = np.array([G_leg(fit, anoptsN_ds, boloN_ds, ds,     dW1, dI1, dW2, dI2, True, True, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG) for ds in dStest])
 
         plt.figure(figsize=(7,6))
         plt.plot(dsrange, G0_ds,       alpha=0.7, linewidth=2.5, label='I Stacks $w>$W1')

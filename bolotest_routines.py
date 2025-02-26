@@ -588,42 +588,31 @@ def Gfrommodel(fit, an_opts, bolo, layer='total'):   # model params, thickness o
     dsub  = bolo['geometry']['dsub']
     dW1   = bolo['geometry']['dW1']; dI1 = bolo['geometry']['dI1']; dW2 = bolo['geometry']['dW2']; dI2 = bolo['geometry']['dI2']
     model = an_opts['model']
+    if layer=='W1': dW2 = np.zeros_like(dsub)
 
-    # GS =  G_leg(fit, an_opts, bolo, dsub, dW1, dI1, dW2,                 dI2, True, False, False)
-    # G_legA = G_leg(fit, an_opts, bolo, dS_ABD, dW1_ABD, dI1_ABC, dW2_AC, dI2_AC, include_S, include_W, include_I, legA=True)   # S-W1-I1-W2-I2
+    GS  = G_leg(fit, an_opts, bolo, dsub, dW1, dI1, dW2, dI2,    True, False, False, legA=True)
+    GW  = G_leg(fit, an_opts, bolo, dsub, dW1, dI1, dW2, dI2,    False, True, False, legA=True)
 
-    GS  = G_leg(fit, an_opts, bolo, dsub, dW1, dI1, dW2,                 dI2,    True, False, False, legA=True)
-    GW1 = G_leg(fit, an_opts, bolo, dsub, dW1, dI1, np.zeros_like(dsub), dI2,    False, True, False, legA=True)
-    GW  = G_leg(fit, an_opts, bolo, dsub, dW1, dI1, dW2,                 dI2,    False, True, False, legA=True)
-
-    if model=='Three-Layer':
-        GI = G_leg(fit, an_opts, bolo, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=True)
-        if an_opts['stack_N']:
-            GSiNx = G_leg(fit, an_opts, bolo, dsub, 0, 0, 0, 0, False, False, True, legA=True)
-    elif model=='Two-Layer':
-        GI = 0
-
-    # elif model=='Two-Layer':
-    #     GI = (G_layer(fit, dI1, layer='S', model=model) + G_layer(fit, dI2, layer='S', model=model)) * lw/5 * (220/ll)**Lscale   # G prediction and error on insulating layers for one leg
+    if model=='Two-Layer':   GI    = 0
+    if model=='Three-Layer': GI    = G_leg(fit, an_opts, bolo, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=True)
+    if an_opts['stack_N']:   GSiNx = G_leg(fit, an_opts, bolo, dsub, 0,   0,   0,    0,  False, False, True, legA=True)
 
     Gwire = GW + GI # G error for microstrip on one leg, summing error works becaSse error is never negative here
 
-    if   layer=='total':  return 4*(GS+Gwire)   # value and error, microstrip + substrate on four legs
-    elif layer=='wiring': return 4*(Gwire)   # value and error, microstrip (W1+I1+W2+I2) on four legs
-    elif layer=='S':      return 4*(GS)   # value and error, substrate on four legs
-    elif layer=='W':      return 4*(GW)   # value and error, W1+W2 on four legs
-    elif layer=='W1':     return 4*(GW1)   # value and error, W1 on four legs
-    elif layer=='I':      return 4*(GI)   # value and error, I1+I2 on four legs
-    elif layer=='SiNx':   return 4*(GSiNx)
+    if   layer=='total':            return 4*(GS+Gwire)   # value and error, microstrip + substrate on four legs
+    elif layer=='wiring':           return 4*(Gwire)   # value and error, microstrip (W1+I1+W2+I2) on four legs
+    elif layer=='S':                return 4*(GS)   # value and error, substrate on four legs
+    elif layer=='W' or layer=='W1': return 4*(GW)   # value and error, W1+W2 on four legs
+    elif layer=='I':                return 4*(GI)   # value and error, I1+I2 on four legs
+    elif layer=='SiNx':             return 4*(GSiNx)
     else: print('Invalid layer type.'); return
 
 def G_bolotest(fit, an_opts, bolo, layer='total'):
     # returns G_TES for bolotest data set given fit parameters
-    # assumes bolotest geometry
     # supG = factor to suppress G of textured substrate on legs B, E, and G
     # can return full substrate + microstrip, just substrate, just microstrip, or an individual W / I layer
 
-    if layer=='total':
+    if   layer=='total':
         include_S = 1; include_W = 1; include_I = 1
     elif layer=='S':
         include_S = 1; include_W = 0; include_I = 0
@@ -636,15 +625,11 @@ def G_bolotest(fit, an_opts, bolo, layer='total'):
     else:
         print('Unknown layer'+layer+'. an_opts include "total", "wiring", "S, "W", and "I".')
 
-    model = an_opts['model']
-    supG = an_opts.get('supG', 0.0)
-
     layer_ds = bolo['geometry']['layer_ds']
     [dS_ABD, dS_CF, dS_E, dS_G, dW1_ABD, dW_E, dI1_ABC, dI_DF, dW2_AC, dW2_B, dI2_AC] = layer_ds.T
 
     # G of individual legs
-    # if model=='Three-Layer':
-        #        G_leg(fit, an_opts, bolo, dS,           dW1,     dI1,     dW2,    dI2,    include_S, include_W, include_I)
+    #        G_leg(fit, an_opts, bolo, dS,           dW1,     dI1,     dW2,    dI2,    include_S, include_W, include_I)
     G_legA = G_leg(fit, an_opts, bolo, dS_ABD,       dW1_ABD, dI1_ABC, dW2_AC, dI2_AC, include_S, include_W, include_I,                legA=True)   # S-W1-I1-W2-I2
     G_legB = G_leg(fit, an_opts, bolo, dS_ABD,       dW1_ABD, dI1_ABC, dW2_B,  0.,     include_S, include_W, include_I, supG_width=2., legB=True)   # S-W1-I1-W2, textured substrate for 2 um
     # G_legB = G_leg(fit, an_opts, bolo, dS_ABD+0.087, dW1_ABD, dI1_ABC, dW2_B,  0.,     include_S, include_W, include_I, supG_width=2., legB=True)   # S-W1-I1-W2, textured substrate for 2 um
@@ -653,37 +638,6 @@ def G_bolotest(fit, an_opts, bolo, layer='total'):
     G_legE = G_leg(fit, an_opts, bolo, dS_E,         0,       0.,      dW_E,   0.,     include_S, include_W, include_I, supG_width=4., legE=True)   # S-W1-W2 (W stack), textured substrate for 4 um
     G_legF = G_leg(fit, an_opts, bolo, dS_CF,        0.,      dI_DF,   0.,     0.,     include_S, include_W, include_I,                legF=True)   # S-I1-I2 (I stack)
     G_legG = G_leg(fit, an_opts, bolo, dS_G,         0.,      0.,      0.,     0.,     include_S, include_W, include_I, supG_width=4., legG=True)   # bare S, textured substrate for 4 um
-
-    # elif model=='Two-Layer':   # treat all nitride layers as the same layer, relevant on legs C and F
-        # G_legA = G_layer(fit, dS_ABD, layer='S', model=model)*include_S                    + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W   + G_layer(fit, dI1_ABC, layer='S', model=model)*include_I     + G_layer(fit, dW2_AC, layer='W', model=model)*3/5*include_W + G_layer(fit, dI2_AC, layer='S', model=model)*include_I   # S-W1-I1-W2-I2
-        # # G_legB = G_layer(fit, dS_ABD+0.087, layer='S', model=model)*include_S*(1-supG*2/5) + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W   + G_layer(fit, dI1_ABC, layer='S', model=model)*3/5*include_I + G_layer(fit, dW2_B, layer='W', model=model)*3/5*include_W   # S-W1-I1-W2
-        # G_legB = G_layer(fit, dS_ABD, layer='S', model=model)*include_S*(1-supG*2/5) + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W   + G_layer(fit, dI1_ABC, layer='S', model=model)*3/5*include_I + G_layer(fit, dW2_B, layer='W', model=model)*3/5*include_W   # S-W1-I1-W2
-        # G_legC = G_layer(fit, dS_CF+dI1_ABC, layer='S', model=model)*(include_S*dS_CF/(dS_CF+dI1_ABC)+include_I*dI1_ABC/(dS_CF+dI1_ABC))+ 0 + 0                                                   + G_layer(fit, dW2_AC, layer='W', model=model)*3/5*include_W + G_layer(fit, dI2_AC, layer='S', model=model)*include_I   # S-I1-W2-I2, S-I1 is one layer
-        # G_legD = G_layer(fit, dS_ABD, layer='S', model=model)*include_S + G_layer(fit, dW1_ABD, layer='W', model=model)*include_W   + G_layer(fit, dI_DF, layer='S', model=model)*include_I   # S-W1-I1-I2 (I stack is one layer)
-        # G_legE = G_layer(fit, dS_E, layer='S', model=model)*include_S*(1-supG*4/5)   + G_layer(fit, dW_E, layer='W', model=model)*3/5*include_W   # S-W1-W2 (W stack)
-        # G_legF = G_layer(fit, dS_CF+dI_DF, layer='S', model=model)*(include_S*dS_CF/(dS_CF+dI_DF)+include_I*dI_DF/(dS_CF+dI_DF))   # S-I1-I2 (S-I1-I2 stack is one layer)
-        # G_legG = G_layer(fit, dS_G, layer='S', model=model)*include_S*(1-supG*4/5)   # bare S
-        #        G_leg(fit, an_opts, bolo, dS,           dW1,     dI1,     dW2,    dI2,    include_S, include_W, include_I)
-        # G_legA = G_leg(fit, an_opts, bolo, dS_ABD,       dW1_ABD, dI1_ABC, dW2_AC, dI2_AC, include_S, include_W, include_I,                legA=True)   # S-W1-I1-W2-I2
-        # G_legB = G_leg(fit, an_opts, bolo, dS_ABD,       dW1_ABD, dI1_ABC, dW2_B,  0.,     include_S, include_W, include_I, supG_width=2., legB=True)   # S-W1-I1-W2, textured substrate for 2 um
-        # # G_legB = G_leg(fit, an_opts, bolo, dS_ABD+0.087, dW1_ABD, dI1_ABC, dW2_B,  0.,     include_S, include_W, include_I, supG_width=2., legB=True)   # S-W1-I1-W2, textured substrate for 2 um
-        # G_legC = G_leg(fit, an_opts, bolo, dS_CF,        0.,      dI1_ABC, dW2_AC, dI2_AC, include_S, include_W, include_I,                legC=True)   # S-I1-W2-I2 (S-I1 stack)
-        # G_legD = G_leg(fit, an_opts, bolo, dS_ABD,       dW1_ABD, dI_DF,   0.,     0.,     include_S, include_W, include_I,                legD=True)   # S-W1-I1-I2 (I stack)
-        # G_legE = G_leg(fit, an_opts, bolo, dS_E,         0,       0.,      dW_E,   0.,     include_S, include_W, include_I, supG_width=4., legE=True)   # S-W1-W2 (W stack), textured substrate for 4 um
-        # G_legF = G_leg(fit, an_opts, bolo, dS_CF,        0.,      dI_DF,   0.,     0.,     include_S, include_W, include_I,                legF=True)   # S-I1-I2 (I stack)
-        # G_legG = G_leg(fit, an_opts, bolo, dS_G,         0.,      0.,      0.,     0.,     include_S, include_W, include_I, supG_width=4., legG=True)   # bare S, textured substrate for 4 um
-
-    # elif model=='Four-Layer':
-    #     #        G_leg(fit, an_opts, bolo, dS,           dW1,     dI1,     dW2,    dI2,    include_S, include_W, include_I)
-    #     G_legA = G_leg(fit, an_opts, bolo, dS_ABD,       dW1_ABD, dI1_ABC, dW2_AC, dI2_AC, include_S, include_W, include_I, include_SiO=True)   # S-W1-I1-W2-I2
-    #     G_legB = G_leg(fit, an_opts, bolo, dS_ABD+0.087, dW1_ABD, dI1_ABC, dW2_B,  0.,     include_S, include_W, include_I, include_SiO=True, supG_width=2., legB=True)   # S-W1-I1-W2, textured substrate for 2 um
-    #     # G_legB = G_leg(fit, an_opts, bolo, dS_ABD+0.150, dW1_ABD, dI1_ABC, dW2_B,  0.,     include_S, include_W, include_I, supG_width=2., legB=True)   # S-W1-I1-W2, textured substrate for 2 um
-    #     G_legC = G_leg(fit, an_opts, bolo, dS_CF,        0.,      dI1_ABC, dW2_AC, dI2_AC, include_S, include_W, include_I, include_SiO=True)   # S-I1-W2-I2 (S-I1 stack)
-    #     G_legD = G_leg(fit, an_opts, bolo, dS_ABD,       dW1_ABD, dI_DF,   0.,     0.,     include_S, include_W, include_I, include_SiO=True)   # S-W1-I1-I2 (I stack)
-    #     G_legE = G_leg(fit, an_opts, bolo, dS_E,         0,       0.,      dW_E,   0.,     include_S, include_W, include_I, include_SiO=True, supG_width=4.)   # S-W1-W2 (W stack), textured substrate for 4 um
-    #     G_legF = G_leg(fit, an_opts, bolo, dS_CF,        0.,      dI_DF,   0.,     0.,     include_S, include_W, include_I, include_SiO=True)   # S-I1-I2 (I stack)
-    #     G_legG = G_leg(fit, an_opts, bolo, dS_G,         0.,      0.,      0.,     0.,     include_S, include_W, include_I, include_SiO=True, supG_width=4.)   # bare S, textured substrate for 4 um
-
 
     # G_TES for bolotest devices
     G_1b = 4*G_legA                         # aka Bolo 1 = 4x(S-W1-I1-W2-I2);                                   slightly over (same quality) with higher G_S in two-layer model
