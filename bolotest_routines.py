@@ -9,6 +9,7 @@ from scipy.optimize import minimize,  curve_fit, fsolve
 from scipy.special import zeta
 from collections import OrderedDict
 from numpy.random import normal
+from datetime import datetime
 import pdb
 
 ### constants
@@ -203,17 +204,57 @@ def acoust_factor(bolo):
     a_factor    = ascale(legl, La) / ascale(220, La)
     return a_factor
 
-def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, include_I,
-          supG_width=0., legA=False, legB=False, legC=False, legD=False, legE=False, legF=False, legG=False):
+def lw_regions(bolo, an_opts):
 
-    beta    = 1.   # power law exponent for width scaling
-    model   = an_opts.get('model')
-    stack_I = an_opts.get('stack_I')
-    stack_N = an_opts.get('stack_N')
-    supG    = an_opts.get('supG', 0.0)
+    # calculate widths of leg regions for each layer stack
+
+    stack_I      = an_opts.get('stack_I')
+    stack_N      = an_opts.get('stack_N')
+    tall_Istacks = an_opts.get('supG', 0.0)
 
     w1w = bolo['geometry'].get('w1w'); w2w = bolo['geometry'].get('w2w')
     lw  = bolo['geometry'].get('lw');  ll  = bolo['geometry'].get('ll')
+
+    w_tiss    = bolo['geometry'].get('w_tiss')
+    d_tiss    = bolo['geometry'].get('d_tiss')   # extra dI1 in region next to W2 on Legs A and C
+
+    if stack_I:
+        if np.isscalar(lw):
+            w_w2      = w2w      if lw > w2w else lw
+            w_w1      = w1w      if lw > w1w else lw
+            if tall_Istacks:
+                w_tistack_W2  = tisw_W2  if lw>w2w+tisw_W2 else np.nanmax(lw-w2w, 0)
+                w_tistack_W2s = tisw_W2s if lw>w2w+tisw_W2 else np.nanmax(lw-w2w, 0)
+                w_tistack_W1  = tisw_W1  if lw>(w2w+tisw_W1) else np.nanmax(lw-w2w, 0)
+                w_tistack_W1s = tisw_W1s if lw>(w2w+tisw_W1) else np.nanmax(lw-w2w, 0)
+            else:
+                w_tistack_W2 = 0
+                w_tistack_W1 = 0
+            # w_tistack = w_tis if lw>w2w+w_tis else np.nanmax(lw-w2w, 0)
+            w_istack  = (lw-w2w-w_tistack_W1-w_tistack_W2) if lw>w2w else 0
+        else:
+            w_w2      = w2w*np.ones(len(lw)); w_w2[lw<w2w] = lw[lw<w2w]
+            w_w1      = w1w*np.ones(len(lw)); w_w1[lw<w1w] = lw[lw<w1w]
+            if tall_Istacks:
+                # w2 taller I stacks exist where lw > w2w - tisw_W2
+                w_tistack_W2 = tisw_W2*np.ones(len(lw)); w_tistack_W2[lw<(w2w-tisw_W2)] = (lw-w2w)[lw<(w2w+tisw_W2)]; w_tistack_W2[lw<w2w] = 0
+                w_tistack_W1 = tisw_W1*np.ones(len(lw)); w_tistack_W1[lw<(w1w-tisw_W1)] = (lw-w1w)[lw<(w1w+tisw_W1)]; w_tistack_W1[lw<w1w] = 0
+            w_istack  = lw-w_w2-w_tistack_W2; w_istack[lw<(w2w+w_tistack_W2)] = 0
+
+
+    return w_w2, w_w1, w_tistack_W2s, w_tistack_W2, w_tistack_W1s, w_tistack_W1
+
+def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, include_I,
+          supG_width=0., legA=False, legB=False, legC=False, legD=False, legE=False, legF=False, legG=False):
+
+    beta         = 1.   # power law exponent for width scaling
+    model        = an_opts.get('model')
+    stack_I      = an_opts.get('stack_I')
+    stack_N      = an_opts.get('stack_N')
+    supG         = an_opts.get('supG', 0.0)
+
+    # w1w = bolo['geometry'].get('w1w'); w2w = bolo['geometry'].get('w2w')
+    # lw  = bolo['geometry'].get('lw');  ll  = bolo['geometry'].get('ll')
 
     # scale with L and d in diffuse / ballistic transition
     if bolo['geometry'].get('acoustic_Lscale'):   # use acoustic scaling
@@ -221,6 +262,29 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
     else:   # use power law length scaling
         pLscale = copy.copy(bolo['geometry']['pLscale'])
         a_factor = (220/ll)**pLscale
+
+    ### geometry nuances, trimming I1 on legs A and C and handling thicker I layers near W layer edges
+    I1trim   = bolo['geometry'].get('I1trim')
+    # w_tiss    = bolo['geometry'].get('w_tiss')
+    # d_tiss    = bolo['geometry'].get('d_tiss')   # extra dI1 in region next to W2 on Legs A and C
+    d_tiss    = bolo['geometry'].get('d_tiss')   # extra dI1 in region next to W2 on Legs A and C
+
+    if legA or legC:   # I1 is trimmed outside of W2 width
+        dI1I2 = dI1 + dI2 - I1trim
+
+    # hard code these thickness changes in for now
+    if legC:
+        # dI1 = dI1 + 0.052
+        dI2 = dI2 + 0.034
+
+    if legD:
+        dS  = dS  - 0.021
+        dW1 = dW1 + 0.009
+
+    if d_tiss:   # handle tall I stacks?
+        [deltad_AW2, deltad_AW1, deltad_CW2, deltad_DW1] = d_tiss
+    else:
+        deltad_AW2, deltad_AW1, deltad_CW2, deltad_DW1 = 0, 0, 0, 0
 
 
     if model=='Two-Layer':   # treat S and I layers the same
@@ -236,8 +300,8 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             G_Sub   = G_layer(fit, dS, layer='S', model=model)   * (w1w/5)      * a_factor * include_S   # 5 um
             G_I1    = G_layer(fit, dI1, layer='S', model=model)     * (w2w/5)      * a_factor * include_S   # 3 um
             G_I2    = G_layer(fit, dI2, layer='S', model=model)     * (w2w/5)      * a_factor * include_S   # 3 um
-            G_I1I2  = G_layer(fit, dI1+dI2, layer='S', model=model) * ((w1w-w2w)/5) * a_factor * include_S   # 3 to 5 um
-            G_SI1I2 = G_layer(fit, dS+dI1+dI2, layer='S', model=model) * ((lw-w1w)/5) * a_factor * include_S   # rest of leg
+            G_I1I2  = G_layer(fit, dI1I2, layer='S', model=model) * ((w1w-w2w)/5) * a_factor * include_S   # 3 to 5 um
+            G_SI1I2 = G_layer(fit, dS+dI1I2, layer='S', model=model) * ((lw-w1w)/5) * a_factor * include_S   # rest of leg
             G_S     = G_Sub + G_I1 + G_I2 + G_I1I2 + G_SI1I2
 
         elif legB:   # S-W1-I1-W2
@@ -260,7 +324,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
 
             G_SI1   = G_layer(fit, dS+dI1, layer='S', model=model)     * (w2w/5)      * a_factor * include_S
             G_I2    = G_layer(fit, dI2, layer='S', model=model)           * (w2w/5)      * a_factor * include_S
-            G_SI1I2 = G_layer(fit, dS+dI1+dI2, layer='S', model=model) * ((lw-w2w)/5) * a_factor * include_S
+            G_SI1I2 = G_layer(fit, dS+dI1I2, layer='S', model=model) * ((lw-w2w)/5) * a_factor * include_S
             G_S     = G_SI1 + G_I2 + G_SI1I2
 
         elif legD:   # S-W1-I1-I2
@@ -304,16 +368,29 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
 
     elif stack_I:   # allow for I1-I2 stacks, including between 3 and 5 um
 
-        if np.isscalar(lw):
-            # w_isep   = w2w if lw>=w2w else lw
-            w_w2     = w2w    if lw > w2w else lw
-            w_w1     = w1w    if lw > w1w else lw
-            w_istack = lw-w2w if lw>w2w else 0
-        else:
-            w_w2     = w2w*np.ones(len(lw)); w_w2[lw<w2w] = lw[lw<w2w]
-            w_w1     = w1w*np.ones(len(lw)); w_w1[lw<w1w] = lw[lw<w1w]
-            w_istack = lw - w_w2; w_istack[lw<w2w] = 0
+        w_w2, w_w1, w_tistack_W2s, w_tistack_W2, w_tistack_W1s, w_tistack_W1 = lw_regions(bolo, an_opts)
 
+        # if np.isscalar(lw):
+        #     w_w2      = w2w      if lw > w2w else lw
+        #     w_w1      = w1w      if lw > w1w else lw
+        #     if tall_Istacks:
+        #         w_tistack_W2  = tisw_W2  if lw>w2w+tisw_W2 else np.nanmax(lw-w2w, 0)
+        #         w_tistack_W2s = tisw_W2s if lw>w2w+tisw_W2 else np.nanmax(lw-w2w, 0)
+        #         w_tistack_W1  = tisw_W1  if lw>(w2w+tisw_W1) else np.nanmax(lw-w2w, 0)
+        #         w_tistack_W1s = tisw_W1s if lw>(w2w+tisw_W1) else np.nanmax(lw-w2w, 0)
+        #     else:
+        #         w_tistack_W2 = 0
+        #         w_tistack_W1 = 0
+        #     # w_tistack = w_tis if lw>w2w+w_tis else np.nanmax(lw-w2w, 0)
+        #     w_istack  = (lw-w2w-w_tistack_W1-w_tistack_W2) if lw>w2w else 0
+        # else:
+        #     w_w2      = w2w*np.ones(len(lw)); w_w2[lw<w2w] = lw[lw<w2w]
+        #     w_w1      = w1w*np.ones(len(lw)); w_w1[lw<w1w] = lw[lw<w1w]
+        #     if tall_Istacks:
+        #         # w2 taller I stacks exist where lw > w2w - tisw_W2
+        #         w_tistack_W2 = tisw_W2*np.ones(len(lw)); w_tistack_W2[lw<(w2w-tisw_W2)] = (lw-w2w)[lw<(w2w+tisw_W2)]; w_tistack_W2[lw<w2w] = 0
+        #         w_tistack_W1 = tisw_W1*np.ones(len(lw)); w_tistack_W1[lw<(w1w-tisw_W1)] = (lw-w1w)[lw<(w1w+tisw_W1)]; w_tistack_W1[lw<w1w] = 0
+        #     w_istack  = lw-w_w2-w_tistack_W2; w_istack[lw<(w2w+w_tistack_W2)] = 0
 
         if legA:   # S-W1-I1-W2-I2
 
@@ -324,10 +401,12 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             G_W    = G_W1 + G_W2
 
             # I1 and I2 are separate to W2 width; I1-I2 stacked beyond W2 width
-            G_I1   = G_layer(fit, dI1,     layer='I', model=model) * (w_w2/5)     * a_factor * include_I
-            G_I2   = G_layer(fit, dI2,     layer='I', model=model) * (w_w2/5)     * a_factor * include_I
-            G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * (w_istack/5) * a_factor * include_I
-            G_I    = G_I1 + G_I2 + G_I1I2
+            G_I1    = G_layer(fit, dI1,     layer='I', model=model) * (w_w2/5)     * a_factor * include_I
+            G_I2    = G_layer(fit, dI2,     layer='I', model=model) * (w_w2/5)     * a_factor * include_I
+            # G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * (w_istack/5) * a_factor * include_I
+            G_tI1I2 = G_layer(fit, dI1I2+d_tis, layer='I', model=model) * (w_tistack/5) * a_factor * include_I   # taller I stack next to W2
+            G_I1I2  = G_layer(fit, dI1I2, layer='I', model=model) * (w_istack/5) * a_factor * include_I
+            G_I     = G_I1 + G_I2 + G_I1I2
 
         elif legB:   # S-W1-I1-W2
 
@@ -350,10 +429,13 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             # I1 and I2 are separate to W2 width; I1-I2 stacked beyond W2 width
             G_I1   = G_layer(fit, dI1, layer='I', model=model)     * (w_w2/5)     * a_factor * include_I
             G_I2   = G_layer(fit, dI2, layer='I', model=model)     * (w_w2/5)     * a_factor * include_I
-            G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * (w_istack/5) * a_factor * include_I
+            # G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * (w_istack/5) * a_factor * include_I
+            G_tI1I2 = G_layer(fit, dI1I2+d_tis, layer='I', model=model) * (w_tistack/5) * a_factor * include_I   # taller I stack next to W2
+            G_I1I2 = G_layer(fit, dI1I2, layer='I', model=model) * (w_istack/5) * a_factor * include_I
             G_I    = G_I1 + G_I2 + G_I1I2
 
         elif legD:   # S-W1-I1-I2
+
             G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5   * a_factor * include_S   # substrate still treated as separate layer
 
             G_W1   = G_layer(fit, dW1, layer='W', model=model)     * w_w1/5 * a_factor * include_W
@@ -365,6 +447,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
 
         elif legE:   # S-W1-W2
             G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5    * a_factor * include_S   # substrate still treated as separate layer
+            # G_S    = (G_layer(fit, dS, layer='S', model=model)*3/5 + G_layer(fit, dS+0.018, layer='S', model=model)*(lw-3)/5)    * a_factor * include_S   # substrate still treated as separate layer
 
             # W1-W2 stack trimmed to W2 width
             G_W1W2 = G_layer(fit, dW1+dW2, layer='W', model=model) * (w_w2/5) * a_factor * include_W
@@ -423,10 +506,10 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             G_I1   = G_layer(fit, dI1,   layer='I', model=model) * (w_w2/5) * a_factor * include_I
             G_I2   = G_layer(fit, dI2,   layer='I', model=model) * (w_w2/5) * a_factor * include_I
             G_SiNx = G_layer(fit, dSiNx, layer='I', model=model) * (w_w1/5) * a_factor * include_I
-
+            # pdb.set_trace()
             # stack nitrides; I1 and I2 stacked between W1 and W2; SiNx stacked after W1
-            G_I1I2     = G_layer(fit, dI1+dI2,       layer='I', model=model) * (w_istack/5) * a_factor * include_I
-            G_SiNxI1I2 = G_layer(fit, dSiNx+dI1+dI2, layer='I', model=model) * (w_sstack/5) * a_factor * include_I   # rest of leg
+            G_I1I2     = G_layer(fit, dI1I2,       layer='I', model=model) * (w_istack/5) * a_factor * include_I
+            G_SiNxI1I2 = G_layer(fit, dSiNx+dI1I2, layer='I', model=model) * (w_sstack/5) * a_factor * include_I   # rest of leg
             G_I    = G_SiNx + G_I1 + G_I2 + G_I1I2 + G_SiNxI1I2
 
         elif legB:   # S-W1-I1-W2
@@ -442,6 +525,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             G_I    = G_SiNx + G_I1
 
         elif legC:   # S-I1-W2-I2
+
             G_S    = G_layer(fit, dOx, layer='S', model=model, dS0=0.400) * lw/5       * a_factor * include_S
 
             # G_W2   = G_layer(fit, dW2, layer='W', model=model)            * (w2w/5)    * a_factor * include_W
@@ -452,10 +536,11 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             # I2 separate to W2 width; SiNx-I1 stack to W2; SiNx-I1-I2 stack beyond W2 width
             G_I2       = G_layer(fit, dI2,   layer='I', model=model)         * (w_w2/5) * a_factor * include_I
             G_SiNxI1   = G_layer(fit, dSiNx+dI1, layer='I', model=model)     * (w_w2/5) * a_factor * include_I   # rest of leg
-            G_SiNxI1I2 = G_layer(fit, dSiNx+dI1+dI2, layer='I', model=model) * ((w_istack + w_sstack)/5) * a_factor * include_I   # rest of leg
+            G_SiNxI1I2 = G_layer(fit, dSiNx+dI1I2, layer='I', model=model) * ((w_istack + w_sstack)/5) * a_factor * include_I   # rest of leg
             G_I        = G_I2 + G_SiNxI1 + G_SiNxI1I2
 
         elif legD:   # S-W1-I1-I2
+
             G_S    = G_layer(fit, dOx, layer='S', model=model, dS0=0.400)    * lw/5     * a_factor * include_S
 
             G_W1   = G_layer(fit, dW1, layer='W', model=model)               * (w_w1/5) * a_factor * include_W
@@ -475,6 +560,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             G_W    = G_W1W2
 
             G_SiNx = G_layer(fit, dSiNx, layer='I', model=model) * (lw/5) * a_factor * include_I
+            # G_SiNx = (G_layer(fit, dSiNx, layer='I', model=model)*3/5 + G_layer(fit, dSiNx+0.018, layer='I', model=model)*(lw-3)/5)    * a_factor * include_S
             G_I    = G_SiNx
 
         elif legF:   # S-I1-I2
@@ -517,7 +603,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             # I1 and I2 separate to W1 width, stacked beyond W1
             G_I1   = G_layer(fit, dI1, layer='I', model=model)     * (w_w1/5)   * a_factor * include_I
             G_I2   = G_layer(fit, dI2, layer='I', model=model)     * (w_w1/5)   * a_factor * include_I
-            G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * (w_istack/5) * a_factor * include_I
+            G_I1I2 = G_layer(fit, dI1I2, layer='I', model=model) * (w_istack/5) * a_factor * include_I
             G_I    = G_I1 + G_I2 + G_I1I2
 
         elif legB:   # S-W1-I1-W2
@@ -541,7 +627,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             # I1 and I2 separate to W1 width, stacked beyond W1
             G_I1   = G_layer(fit, dI1,     layer='I', model=model) * (w_w1/5)     * a_factor * include_I
             G_I2   = G_layer(fit, dI2,     layer='I', model=model) * (w_w1/5)     * a_factor * include_I
-            G_I1I2 = G_layer(fit, dI1+dI2, layer='I', model=model) * (w_istack/5) * a_factor * include_I
+            G_I1I2 = G_layer(fit, dI1I2, layer='I', model=model) * (w_istack/5) * a_factor * include_I
             G_I    = G_I1 + G_I2 + G_I1I2
 
         elif legD:   # S-W1-I1-I2
@@ -595,7 +681,7 @@ def Gfrommodel(fit, an_opts, bolo, layer='total'):   # model params, thickness o
 
     if model=='Two-Layer':   GI    = 0
     if model=='Three-Layer': GI    = G_leg(fit, an_opts, bolo, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=True)
-    if an_opts['stack_N']:   GSiNx = G_leg(fit, an_opts, bolo, dsub, 0,   0,   0,    0,  False, False, True, legA=True)
+    if an_opts['stack_N']:   GSiNx = G_leg(fit, an_opts, bolo, dsub, np.zeros_like(dsub), np.zeros_like(dsub), np.zeros_like(dsub), np.zeros_like(dsub), False, False, True, legA=True)
 
     Gwire = GW + GI # G error for microstrip on one leg, summing error works becaSse error is never negative here
 
@@ -691,6 +777,7 @@ def runsim_chisq(bolo, an_opts, plot_opts, save_sim=False):
     sim_layerds = np.empty((num_its, len(layer_ds)))
     Gwires = np.empty((num_its, len(ydata)))
 
+    print('starting sim at {now}'.format(now=datetime.now().time())); print('\n')
     for ii in np.arange(num_its):   # run simulation
         y_its[ii] = np.random.normal(ydata, sigma)   # pull G's from normal distribution characterized by fit error
 
@@ -714,9 +801,9 @@ def runsim_chisq(bolo, an_opts, plot_opts, save_sim=False):
         it_result = minimize(chisq_val, p0, args=[an_opts, it_bolo], bounds=bounds)   # minimize chi-squared function with this iteration's G_TES values and film thicknesses
         pfits_sim[ii] = it_result['x']   # fit parameters for this iteration
 
-        if   ii/num_its == 0.25: print('25% Finished'); print('\n')
-        elif ii/num_its == 0.50: print('50% Finished'); print('\n')
-        elif ii/num_its == 0.75: print('75% Finished'); print('\n')
+        if   ii/num_its == 0.25: print('25% Finished at {now}'.format(now=datetime.now().time())); print('\n')
+        elif ii/num_its == 0.50: print('50% Finished at {now}'.format(now=datetime.now().time())); print('\n')
+        elif ii/num_its == 0.75: print('75% Finished at {now}'.format(now=datetime.now().time())); print('\n')
 
     print('Finished Simulation'); print('\n')
 
@@ -740,10 +827,10 @@ def runsim_chisq(bolo, an_opts, plot_opts, save_sim=False):
 
     # save analysis options and bolometer geometry/data
     sim_dict['an_opts'] = an_opts
-    sim_dict['bolo'] = bolo
+    sim_dict['bolo']    = bolo
 
     # sort and save fit results
-    fit_dict = sort_results(sim_dict, print_results=True)
+    fit_dict        = sort_results(sim_dict, print_results=True)
     sim_dict['fit'] = fit_dict
 
     if save_sim:
@@ -783,11 +870,11 @@ def sort_results(sim_dict, print_results=False, spinds=np.array([])):
 
     # load simulation parameters
     an_opts = sim_dict['an_opts']
-    model = an_opts['model']
-    calc =  an_opts['calc']
+    model   = an_opts['model']
+    calc    = an_opts['calc']
 
     bolo = sim_dict['bolo']
-    L = sim_dict['bolo']['geometry']['ll']  # um, bolotest leg length
+    L   = sim_dict['bolo']['geometry']['ll']  # um, bolotest leg length
     A_S = 5*0.400; A_W = 5*0.400; A_I = 5*0.400   # um^2, for converting G(d0) to kappa
 
     # look at subpopulation of fit parameters?
@@ -796,12 +883,12 @@ def sort_results(sim_dict, print_results=False, spinds=np.array([])):
     Gpreds = sim_dict['Gpreds'][spinds]; Gwires = sim_dict['Gwires'][spinds]; sim = sim_dict['sim']['fit_params'][spinds]
     Gpred_Ss = sim_dict['Gpred_Ss'][spinds]; Gpred_Ws = sim_dict['Gpred_Ws'][spinds]; Gpred_Is = sim_dict['Gpred_Is'][spinds]   # U, W, and I contributions to Gpredicted
 
-    sim_params_mean = np.mean(sim, axis=0); Gwire_mean = np.mean(Gwires); Gpred_mean = np.mean(Gpreds, axis=0)
-    Gpred_S_mean = np.mean(Gpred_Ss, axis=0); Gpred_W_mean = np.mean(Gpred_Ws, axis=0); Gpred_I_mean = np.mean(Gpred_Is, axis=0)
-    sim_params_med = np.median(sim, axis=0); Gwire_med = np.median(Gwires); Gpred_med = np.median(Gpreds, axis=0)
-    Gpred_S_med = np.median(Gpred_Ss, axis=0); Gpred_W_med = np.median(Gpred_Ws, axis=0); Gpred_I_med = np.median(Gpred_Is, axis=0)
-    sim_std = np.std(sim, axis=0); sigma_Gwire = np.std(Gwires); sigma_Gpred = np.std(Gpreds, axis=0)
-    sigma_GpredS = np.std(Gpred_Ss, axis=0); sigma_GpredW = np.std(Gpred_Ws, axis=0); sigma_GpredI = np.std(Gpred_Is, axis=0)
+    sim_params_mean = np.mean(sim, axis=0);        Gwire_mean   = np.mean(Gwires); Gpred_mean = np.mean(Gpreds, axis=0)
+    Gpred_S_mean    = np.mean(Gpred_Ss, axis=0);   Gpred_W_mean = np.mean(Gpred_Ws, axis=0); Gpred_I_mean = np.mean(Gpred_Is, axis=0)
+    sim_params_med  = np.median(sim, axis=0);      Gwire_med    = np.median(Gwires); Gpred_med = np.median(Gpreds, axis=0)
+    Gpred_S_med     = np.median(Gpred_Ss, axis=0); Gpred_W_med  = np.median(Gpred_Ws, axis=0); Gpred_I_med = np.median(Gpred_Is, axis=0)
+    sim_std         = np.std(sim, axis=0);         sigma_Gwire  = np.std(Gwires); sigma_Gpred = np.std(Gpreds, axis=0)
+    sigma_GpredS    = np.std(Gpred_Ss, axis=0);    sigma_GpredW = np.std(Gpred_Ws, axis=0); sigma_GpredI = np.std(Gpred_Is, axis=0)
 
     if calc == 'Mean':
         sim_params = sim_params_mean; Gwire = Gwire_mean; Gpred = Gpred_mean
@@ -1176,10 +1263,10 @@ def plot_modelvdata(sim_dict, plot_opts, up_bolo=None, title='', plot_bolotest=T
     plt.ylabel('\\textbf{N. Res.}', labelpad=-2)
     plt.xlabel('\\textbf{Leg Area [$\\boldsymbol{\mu m^\\mathit{2}}$]}')
     plt.xlim(ax_xlim)
-    plt.ylim(-1.1, 1.1)
-    # plt.ylim(-5, 5)
+    # plt.ylim(-1.1, 1.1)
+    plt.ylim(-3, 3)
     # plt.tick_params(axis='y', which='both', right=True)
-    # plt.fill_between((ax_xlim), -1, 1, facecolor='k', alpha=0.2)   # +/- 1 sigma
+    plt.fill_between((ax_xlim), -1, 1, facecolor='k', alpha=0.2)   # +/- 1 sigma
     plt.grid(linestyle = '--', which='both', linewidth=0.5, zorder=-1)
     plt.subplots_adjust(hspace=0.075)   # merge to share one x axis
 
@@ -1303,34 +1390,48 @@ def plot_Glegacy(legacy, plot_opts, bolotest={}, analyze_vlength=False, fs=(7,5)
         plt.ylabel('G [pW/K]'); plt.xlabel('Leg Length [um]')
         plt.savefig(plot_dir+'legacydata_lengthscaling.png', dpi=300)
 
-def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,6), dof=1, plot_vwidth=False, plot_bysubpop=False, show_percdiff=False, plot_wgrad=False, twomodels=False):
+def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, fs=(9,6), dof=1):
     # predicts G for legacy TES data using alpha model, then plots prediction vs measurements (scaled to 170 mK)
     # legacy geometry and measurements are from Shannon's spreadsheet, then plots
 
-    if title=='': title = sim_dict['an_opts'].get('title')
     save_figs     = plot_opts['save_figs']
+    title         = plot_opts['title']
     plot_comments = plot_opts['plot_comments']
     plot_dir      = plot_opts['plot_dir']
     plot_bolo1b   = plot_opts['plot_bolo1b']
 
-    an_opts = sim_dict['an_opts']
+    pred_wfit     = plot_opts.get('pred_wfit')
+    plot_vwidth   = plot_opts.get('plot_vwidth')
+    plot_bysubpop = plot_opts.get('plot_bysubpop')
+    plot_wgrad    = plot_opts.get('plot_wgrad')
+    show_percdiff = plot_opts.get('show_percdiff')
+
+    an_opts     = sim_dict['an_opts']
     fn_comments = an_opts['fn_comments']
-    sim_data = sim_dict['sim']['fit_params']
+    sim_data    = sim_dict['sim']['fit_params']
 
     ### legacy data
     legacy_Gs = legacy['G170mK']
     legacy_ll = legacy['geometry']['ll']
     legacy_lw = legacy['geometry']['lw']
 
-    Gpreds  = Gfrommodel(sim_data, an_opts, legacy)   # predictions from each set of fit parameters [pW/K]
-    GpredSs = Gfrommodel(sim_data, an_opts, legacy, layer='S')
-    GpredWs = Gfrommodel(sim_data, an_opts, legacy, layer='W')
-    GpredIs = Gfrommodel(sim_data, an_opts, legacy, layer='I')
+    if pred_wfit:   # use single set of fit parameters
+        fit = sim_dict['fit']['fit_params']
 
-    Gpred   = np.median(Gpreds, axis=0);  sigma_Gpred  = np.std(Gpreds, axis=0)   # predictions and error [pW/K]
-    Gpred_S = np.median(GpredSs, axis=0); sigma_GpredS = np.std(GpredSs, axis=0)     # predictions and error of substrate layers [pW/K]
-    Gpred_W = np.median(GpredWs, axis=0); sigma_GpredW = np.std(GpredWs, axis=0)   # predictions and error [pW/K]
-    Gpred_I = np.median(GpredIs, axis=0); sigma_GpredI = np.std(GpredIs, axis=0)   # predictions and error [pW/K]
+        Gpred  = Gfrommodel(fit, an_opts, legacy)            ; sigma_Gpred  = np.zeros_like(Gpred)
+        Gpred_S = Gfrommodel(fit, an_opts, legacy, layer='S'); sigma_GpredS = np.zeros_like(Gpred)
+        Gpred_W = Gfrommodel(fit, an_opts, legacy, layer='W'); sigma_GpredW = np.zeros_like(Gpred)
+        Gpred_I = Gfrommodel(fit, an_opts, legacy, layer='I'); sigma_GpredI = np.zeros_like(Gpred)
+    else:   # use simulated set of fit parameters
+        Gpreds  = Gfrommodel(sim_data, an_opts, legacy)   # predictions from each set of fit parameters [pW/K]
+        GpredSs = Gfrommodel(sim_data, an_opts, legacy, layer='S')
+        GpredWs = Gfrommodel(sim_data, an_opts, legacy, layer='W')
+        GpredIs = Gfrommodel(sim_data, an_opts, legacy, layer='I')
+
+        Gpred   = np.median(Gpreds, axis=0);  sigma_Gpred  = np.std(Gpreds, axis=0)   # predictions and error [pW/K]
+        Gpred_S = np.median(GpredSs, axis=0); sigma_GpredS = np.std(GpredSs, axis=0)     # predictions and error of substrate layers [pW/K]
+        Gpred_W = np.median(GpredWs, axis=0); sigma_GpredW = np.std(GpredWs, axis=0)   # predictions and error [pW/K]
+        Gpred_I = np.median(GpredIs, axis=0); sigma_GpredI = np.std(GpredIs, axis=0)   # predictions and error [pW/K]
 
     # if an_opts['stack_N']:
     #     # bolo_SiNx = copy.deepcopy(legacy)
@@ -1384,7 +1485,7 @@ def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,6)
     plot_labs   = legacy['geometry']['plot_labs'] if 'plot_labs' in legacy['geometry'] else 'Legacy Data'
 
     fig = plt.figure(figsize=fs)
-    gs = gridspec.GridSpec(2, 1, height_ratios=[3, 1])
+    gs = gridspec.GridSpec(2, 1, height_ratios=[2, 1])
     ax1 = plt.subplot(gs[0])   # model vs data
 
     lorder = [0, 1]
@@ -1421,17 +1522,29 @@ def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,6)
         plt.plot(legacy_x[low_lw],  legacy_Gs[low_lw],  markersize=7, marker='o', label=plot_labs[0], linestyle='None')
         plt.plot(legacy_x[mid_lw],  legacy_Gs[mid_lw],  markersize=7, marker='o', label=plot_labs[1], linestyle='None')
         plt.plot(legacy_x[high_lw], legacy_Gs[high_lw], markersize=7, marker='o', label=plot_labs[2], linestyle='None')
+        plt.errorbar(legacy_x, Gpred, yerr=sigma_Gpred,  marker='*', markersize=11, linestyle='None', color='k', label=m1lab, capsize=3, alpha=0.4)
         lorder = [0, 1, 2, 3]
     elif plot_bysubpop:
         sps = legacy['geometry']['subpops']
         for sp, pop in enumerate(sps):
             plt.plot(legacy_x[pop],  legacy_Gs[pop],  markersize=7, marker='o', label=plot_labs[sp], linestyle='None')
         lorder = np.concatenate([[0], np.arange(len(sps))+1])
+        plt.errorbar(legacy_x, Gpred, yerr=sigma_Gpred,  marker='*', markersize=11, linestyle='None', color='k', label=m1lab, capsize=3, alpha=0.4)
     elif plot_wgrad:
         scatter = plt.scatter(legacy_x, legacy_Gs, c=legacy_lw, cmap='viridis', s=40, vmin=vmin, vmax=vmax, label='Legacy Data')
+
+        # color mapped error bars
+        norm   = matplotlib.colors.Normalize(vmin=vmin, vmax=vmax, clip=True)
+        mapper = matplotlib.cm.ScalarMappable(norm=norm, cmap='viridis')
+        mcolors = np.array([(mapper.to_rgba(lw)) for lw in legacy_lw])
+
+        for x, Gp1, sig, color in zip(legacy_x, Gpred, sigma_Gpred, mcolors):
+            plt.errorbar(x*1.07, Gp1, yerr=sig, marker='*', capsize=4, color='white', zorder=-1, linestyle='None', markeredgecolor='none', markersize=10)
+            plt.errorbar(x*1.07, Gp1, yerr=sig, marker='*', capsize=4, color=color,   zorder=-1, linestyle='None', markeredgecolor='none', markersize=10, alpha=0.5, label=m1lab)
+
     else:
         plt.plot(legacy_x, legacy_Gs,                marker='o', markersize=9, linestyle='None', color='darkorange', label='Legacy Data')
-    plt.errorbar(legacy_x, Gpred, yerr=sigma_Gpred,  marker='*', markersize=11, linestyle='None', color='k', label=m1lab, capsize=3, alpha=0.4)
+        plt.errorbar(legacy_x, Gpred, yerr=sigma_Gpred,  marker='*', markersize=11, linestyle='None', color='k', label=m1lab, capsize=3, alpha=0.4)
 
     plt.plot(    legacy_x, Gpred_S, color='blue',       marker='d', markersize=7,  label='G$_\\text{S}$', linestyle='None')
     plt.plot(    legacy_x, Gpred_I, color='blueviolet', marker='s', markersize=5,  label='G$_\\text{I}$', linestyle='None', alpha=0.8)#, fillstyle='none', markeredgewidth=1.5)
@@ -1459,7 +1572,10 @@ def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,6)
     ax2 = plt.subplot(gs[1], sharex=ax1); ax_xlim = ax2.get_xlim()   # residuals
     plt.axhline(0, color='k', alpha=0.5)
     if show_percdiff:
-        plt.scatter(legacy_x, normres, color='k', s=80, marker='*')
+        if plot_wgrad:
+            plt.scatter(legacy_x, normres, c=legacy_lw, cmap='viridis', vmin=vmin, vmax=vmax, s=80, marker='*')
+        else:
+            plt.scatter(legacy_x, normres, color='k', s=80, marker='*')
     elif plot_bywidth:
         plt.scatter(legacy_x[low_lw],  normres[low_lw],  s=40, marker='o')
         plt.scatter(legacy_x[mid_lw],  normres[mid_lw],  s=40, marker='o')
@@ -1477,10 +1593,11 @@ def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, title='', fs=(9,6)
         plt.fill_between((0, max(legacy_x)*5), -1, 1, facecolor='gray', alpha=0.5)   # +/- 1 sigma
     if plot_bolo1b: plt.scatter(x_1b, normres_1b,   color='red', s=80, marker='o', alpha=0.6)
     plt.xlabel(x_label); plt.xlim(ax_xlim)
-    plt.ylabel(rylab); plt.ylim(rylim)
+    plt.ylabel(rylab)#; plt.ylim(rylim)
     # plt.tick_params(axis='y', which='both', right=True)
     plt.grid(linestyle = '--', which='both', linewidth=0.5)
     plt.subplots_adjust(hspace=0.075)   # merge to share one x axis
+    plt.suptitle(title, y=0.92)
 
     if plot_wgrad:   # color bar
         cbar = fig.colorbar(scatter, ax=[ax1, ax2])

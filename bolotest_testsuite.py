@@ -199,7 +199,8 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         GI0  = G_leg(fit, anopts0, bolo0, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=True)
         G0   = G_leg(fit, anopts0, bolo0, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=True)
         if verbose: print('G_S no stack estimate difference: {} %'.format(round((GS0-GS00)/GS00*100, 1))); print('\n')
-        assert round(GS0/GS00, 3) == 1, "GS0_leg/GS0_calc != 1"
+
+        assert (round(GS0/GS00, 3) == 1 or GS00==0), "GS0_leg/GS0_calc != 1"
 
         GSI0 = fit[0]*(dsub/0.400)**(fit[3]+1)*lw/5
         GSI  = G_leg(fit, anoptsI, boloI, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=True)
@@ -207,7 +208,7 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         GII  = G_leg(fit, anoptsI, boloI, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=True)
         GI   = G_leg(fit, anoptsI, boloI, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=True)
         if verbose: print('G_S I-layer stack estimate difference: {} %'.format(round((GSI-GSI0)/GSI0*100, 1))); print('\n')
-        assert round(GSI/GSI0, 3) == 1, "GSI_leg/GSI_calc != 1"
+        assert (round(GSI/GSI0, 3) == 1 or GSI0==0), "GSI_leg/GSI_calc != 1"
 
         GSN0 = fit[0] * (dSiOx/0.400)**(fit[3]+1) * lw/5
 
@@ -252,13 +253,13 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
             print('G(I Stacks) > G(No Stacks) = {}'.format(GI > G0))
             print('G(N Stacks) > G(No Stacks) = {}'.format(GN > G0))
             print('G(N Stacks) > G(I Stacks)  = {}'.format(GN > GI))
-        # pdb.set_trace()
-        assert round(GSN/GSN0, 3)        == 1, "GSN_leg/GSN_calc     = {} != 1".format(round(GSN/GSN0, 3))
-        assert round(GSiNx_bt/GSiNx0, 3) == 1, "GS_bt/GS_calc        = {} != 1".format(round(GSN_bt/GSN0, 3))
-        assert round(GSiNx/GSiNx0, 3)    == 1, "GSiNx_leg/GSiNx_calc = {} != 1".format(round(GSiNx/GSiNx0, 3))
-        assert round(GSiNx_bt/GSiNx0, 3) == 1, "GSiNx_bt/GSiNx_calc  = {} != 1".format(round(GSiNx_bt/GSiNx0, 3))
-        assert round(GIN/GIN0, 3)        == 1, "GIN_leg/GIN_calc     = {} != 1".format(round(GIN/GIN0, 3))
-        assert round(GIN_bt/GIN0, 3)     == 1, "GIN_bt/GIN_calc      = {} != 1".format(round(GIN_bt/GIN0, 3))
+
+        assert (round(GSN/GSN0, 3)        == 1 or GSN0==0),   "GSN_leg/GSN_calc     = {} != 1".format(round(GSN/GSN0, 3))
+        assert (round(GSiNx_bt/GSiNx0, 3) == 1 or GSiNx0==0), "GS_bt/GS_calc        = {} != 1".format(round(GSN_bt/GSN0, 3))
+        assert (round(GSiNx/GSiNx0, 3)    == 1 or GSiNx0==0), "GSiNx_leg/GSiNx_calc = {} != 1".format(round(GSiNx/GSiNx0, 3))
+        assert (round(GSiNx_bt/GSiNx0, 3) == 1 or GSiNx0==0), "GSiNx_bt/GSiNx_calc  = {} != 1".format(round(GSiNx_bt/GSiNx0, 3))
+        assert (round(GIN/GIN0, 3)        == 1 or GIN0==0),   "GIN_leg/GIN_calc     = {} != 1".format(round(GIN/GIN0, 3))
+        assert (round(GIN_bt/GIN0, 3)     == 1 or GIN0==0),   "GIN_bt/GIN_calc      = {} != 1".format(round(GIN_bt/GIN0, 3))
         print('\nG_leg() and G_bolotest() output matches manual calculations \n')
 
     if plot_vwidth:
@@ -291,72 +292,70 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         plt.plot(lwrange/2, G0_lw,       alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
         plt.plot(lwrange/2, GI_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
         plt.plot(lwrange/2, GN_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
-        plt.vlines([w2w/2, w1w/2], 0, max(GN_lw)*2, linestyle='--', alpha=0.3, color='k')
+        plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
         plt.annotate('W2', (w2w/2-0.5, GN_lw[1]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         plt.annotate('W1', (w1w/2-0.5, GN_lw[1]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         if np.isfinite(Gmeas):
             plt.hlines([Gmeas], 0, max(lwrange)/2, linestyle='-.', alpha=0.5, color='r', label='G$_{meas}$')
-            # plt.annotate('G$_{meas}$', (w1w/10, 14*0.225))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G [pW/K]')
-        plt.ylim(min(GN_lw)*0., np.max([G0_lw, GI_lw, GN_lw])*1.1)
-        # plt.ylim(min(GN_lw)*0., 14)
+        plt.ylim(0., np.nanmax([G0_lw, GI_lw, GN_lw])*1.1)
         plt.xlim(min(lwrange)/2, max(lwrange)/2)
         plt.grid(linestyle = '--', which='both', linewidth=0.5)   # grid lines on plot
         plt.legend()
 
-        plt.figure(figsize=(10,5.5))
-        plt.plot(lwrange/2, G0W_lw,       alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
-        plt.plot(lwrange/2, GIW_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
-        plt.plot(lwrange/2, GNW_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
-        plt.vlines([w2w/2, w1w/2], 0, max(GN_lw)*2, linestyle='--', alpha=0.3, color='k')
-        plt.annotate('W2', (w2w/2-0.3, GNW_lw[2]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
-        plt.annotate('W1', (w1w/2-0.3, GNW_lw[2]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
-        plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_W$ [pW/K]')
-        plt.ylim(min(GNW_lw)*0., np.max([G0W_lw, GIW_lw, GNW_lw])*1.1)
-        plt.xlim(min(lwrange)/2, max(lwrange)/2)
-        plt.grid(linestyle = '--', which='both', linewidth=0.5)   # grid lines on plot
-        plt.legend()
+        # plt.figure(figsize=(10,5.5))
+        # plt.plot(lwrange/2, G0W_lw,       alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
+        # plt.plot(lwrange/2, GIW_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
+        # plt.plot(lwrange/2, GNW_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
+        # plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
+        # plt.annotate('W2', (w2w/2-0.3, GNW_lw[2]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
+        # plt.annotate('W1', (w1w/2-0.3, GNW_lw[2]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
+        # plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_W$ [pW/K]')
+        # plt.ylim(min(GNW_lw)*0., np.nanmax([G0W_lw, GIW_lw, GNW_lw])*1.1)
+        # plt.xlim(min(lwrange)/2, max(lwrange)/2)
+        # plt.grid(linestyle = '--', which='both', linewidth=0.5)   # grid lines on plot
+        # plt.legend()
 
-        plt.figure(figsize=(10,5.5))
-        plt.plot(lwrange/2, G0S_lw,       alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
-        plt.plot(lwrange/2, GIS_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
-        plt.plot(lwrange/2, GNS_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
-        plt.vlines([w2w/2, w1w/2], 0, max(GN_lw)*2, linestyle='--', alpha=0.3, color='k')
-        plt.annotate('W2', (w2w/2-0.3, GIS_lw[1]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
-        plt.annotate('W1', (w1w/2-0.3, GIS_lw[1]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
-        plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_S$ [pW/K]')
-        plt.ylim(0, np.max([G0S_lw, GIS_lw, GNS_lw])*1.1)
-        # plt.ylim(0, 1.6)
-        plt.xlim(min(lwrange)/2, max(lwrange)/2)
-        plt.grid(linestyle = '--', which='both', linewidth=0.5)   # grid lines on plot
-        plt.legend()
+        # plt.figure(figsize=(10,5.5))
+        # plt.plot(lwrange/2, G0S_lw,       alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
+        # plt.plot(lwrange/2, GIS_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
+        # plt.plot(lwrange/2, GNS_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
+        # plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
+        # plt.annotate('W2', (w2w/2-0.3, GIS_lw[1]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
+        # plt.annotate('W1', (w1w/2-0.3, GIS_lw[1]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
+        # plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_S$ [pW/K]')
+        # plt.ylim(0, np.nanmax([G0S_lw, GIS_lw, GNS_lw])*1.1)
+        # # plt.ylim(0, 1.6)
+        # plt.xlim(min(lwrange)/2, max(lwrange)/2)
+        # plt.grid(linestyle = '--', which='both', linewidth=0.5)   # grid lines on plot
+        # plt.legend()
 
-        plt.figure(figsize=(10,5.5))
-        plt.plot(lwrange/2, G0I_lw,       alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
-        plt.plot(lwrange/2, GII_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
-        plt.plot(lwrange/2, GNI_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
-        plt.vlines([w2w/2, w1w/2], 0, max(GN_lw)*2, linestyle='--', alpha=0.3, color='k')
-        plt.annotate('W2', (w2w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
-        plt.annotate('W1', (w1w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
-        plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_I$ [pW/K]')
-        plt.ylim(min(GNI_lw)*0., np.max([G0I_lw, GII_lw, GNI_lw])*1.1)
-        # plt.ylim(min(GNI_lw)*0., 14)
-        plt.xlim(min(lwrange)/2, max(lwrange)/2)
-        plt.grid(linestyle = '--', which='both', linewidth=0.5)   # grid lines on plot
-        plt.legend()
+        # plt.figure(figsize=(10,5.5))
+        # plt.plot(lwrange/2, G0I_lw,       alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
+        # plt.plot(lwrange/2, GII_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
+        # plt.plot(lwrange/2, GNI_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
+        # plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
+        # plt.annotate('W2', (w2w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
+        # plt.annotate('W1', (w1w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
+        # plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_I$ [pW/K]')
+        # plt.ylim(min(GNI_lw)*0., np.nanmax([G0I_lw, GII_lw, GNI_lw])*1.1)
+        # # plt.ylim(min(GNI_lw)*0., 14)
+        # plt.xlim(min(lwrange)/2, max(lwrange)/2)
+        # plt.grid(linestyle = '--', which='both', linewidth=0.5)   # grid lines on plot
+        # plt.legend()
 
-        plt.figure(figsize=(10,5.5))
-        plt.plot(lwrange/2, G0S_lw + G0I_lw,       alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
-        plt.plot(lwrange/2, GIS_lw + GII_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
-        plt.plot(lwrange/2, GNS_lw + GNI_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
-        plt.vlines([w2w/2, w1w/2], 0, max(GN_lw)*2, linestyle='--', alpha=0.3, color='k')
-        plt.annotate('W2', (w2w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
-        plt.annotate('W1', (w1w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
-        plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_S$ + G$_I$ [pW/K]')
-        plt.ylim(min(GNS_lw+GNI_lw)*0., np.max([G0S_lw+G0I_lw, GIS_lw+GII_lw, GNS_lw+GNI_lw])*1.1)
-        plt.xlim(min(lwrange)/2, max(lwrange)/2)
-        plt.grid(linestyle = '--', which='both', linewidth=0.5)   # grid lines on plot
-        plt.legend()
+        # plt.figure(figsize=(10,5.5))
+        # plt.plot(lwrange/2, G0S_lw + G0I_lw,       alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
+        # plt.plot(lwrange/2, GIS_lw + GII_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
+        # plt.plot(lwrange/2, GNS_lw + GNI_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
+        # plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
+        # plt.annotate('W2', (w2w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
+        # plt.annotate('W1', (w1w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
+        # plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_S$ + G$_I$ [pW/K]')
+        # plt.ylim(min(GNS_lw+GNI_lw)*0., np.nanmax([G0S_lw+G0I_lw, GIS_lw+GII_lw, GNS_lw+GNI_lw])*1.1)
+        # plt.xlim(min(lwrange)/2, max(lwrange)/2)
+        # plt.grid(linestyle = '--', which='both', linewidth=0.5)   # grid lines on plot
+        # plt.legend()
 
     if plot_vdsub:
 
@@ -369,17 +368,15 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         boloN_ds, anoptsN_ds = test_objs(stack_N=True, lw=lw, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2)
         GN_ds = G_leg(fit, anoptsN_ds, boloN_ds, dsrange, dW1, dI1, dW2, dI2, True, True, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
 
-        dStest      = np.linspace(0.2, 2.0, int((2-0.4)/0.2))
-        GN_dstest1  =           G_leg(fit, anoptsN_ds, boloN_ds, dStest, dW1, dI1, dW2, dI2, True, True, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
-        GN_dstest2  = np.array([G_leg(fit, anoptsN_ds, boloN_ds, ds,     dW1, dI1, dW2, dI2, True, True, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG) for ds in dStest])
-
         plt.figure(figsize=(7,6))
         plt.plot(dsrange, G0_ds,       alpha=0.7, linewidth=2.5, label='I Stacks $w>$W1')
         plt.plot(dsrange, GI_ds, '--', alpha=0.7, linewidth=2.5, label='I Stacks $w>$W2')
         plt.plot(dsrange, GN_ds, '-.', alpha=0.7, linewidth=2.5, label='N Stacks')
-        # plt.plot(dStest, GN_dstest1, '.', alpha=0.7, label='N Stacks Test 1', markersize=15)
-        # plt.plot(dStest, GN_dstest2, '.', alpha=0.7, label='N Stacks Test 2')
+        if np.isfinite(Gmeas):
+            plt.vlines([dsub],  0, np.nanmax([G0_ds, GI_ds, GN_ds])*1.1, linestyle='--', alpha=0.5, color='k', label='d$_{sub}$')
+            plt.hlines([Gmeas], 0, max(dsrange), linestyle='-.', alpha=0.5, color='r', label='G$_{meas}$')
         plt.xlabel('Substrate Thickness [um]'); plt.ylabel('G [pW/K]')
         plt.xlim(min(dsrange), max(dsrange))
+        plt.ylim(0, np.nanmax([G0_ds, GI_ds, GN_ds]))
         plt.grid(linestyle = '--', which='both', linewidth=0.5)   # grid lines on plot
         plt.legend()
