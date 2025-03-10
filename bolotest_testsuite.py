@@ -2,8 +2,8 @@
 from bolotest_routines import *
 
 ### testing suite - test model output
-def test_objs(lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0, dI1=0, dW2=0, dI2=0,
-                model='Three-Layer', stack_I=False, stack_N=False, constrained=False, supG=0.0, calc='Median'):
+def test_objs(lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0, dI1=0, dW2=0, dI2=0, d_tiss=np.array([0, 0, 0, 0, 0]), w_tiss=np.array([0, 0, 0, 0]),
+                model='Three-Layer', stack_I=False, stack_N=False, tall_Istacks=False, constrained=False, supG=0.0, calc='Median'):
     ### create dummy objects for testing
 
     test_bolo = {}; test_bolo['geometry'] = {}
@@ -19,10 +19,13 @@ def test_objs(lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0, dI1=0,
     test_bolo['geometry']['dI1']      = dI1; test_bolo['geometry']['dI2'] = dI2   # [um] leg A film thicknesses
     test_bolo['geometry']['La']       = ll;  test_bolo['geometry']['acoustic_Lscale'] = True   # bolotest acoustic length - shouldn't matter because acoustic scaling ratio should be 1
     test_bolo['geometry']['dSiOx']    = dSiOx   # [um] SiOx thickness of substrate layer
+    test_bolo['geometry']['d_tiss']   = d_tiss   # [um] layer thickness adjustments near W1 and W2 edges
+    test_bolo['geometry']['w_tiss']   = w_tiss   # [um] widths of layer thickness adjustment regions
 
     test_anopts = {}
     test_anopts['stack_I']        = stack_I   # account for I1-I2 stacks in areas wider than W2
     test_anopts['stack_N']        = stack_N   # account for S-I1-I2 stacks in areas wider than W1
+    test_anopts['tall_Istacks']   = tall_Istacks   # account for taller I layers at W layer edges
     test_anopts['constrained']    = constrained   # use constrained model results
     test_anopts['model']          = model   # Two-, Three-, or Four-Layer model?
     test_anopts['supG']           = supG    # reduce G for substrate on legs B, E & G based on surface roughness
@@ -148,7 +151,6 @@ def test_alphascaleI(verbose=False):
 
         # w2 < w < w1 - GN = GI = G0^2
         GI_w1_bt,   GI_w1_leg = GI_test(fit_aI1, dI1, dI2, lw=w1w, w1w=w1w, w2w=w2w)
-        # pdb.set_trace()
         GI0_w1_bt,  GII_w1_bt,  GIN_w1_bt  = np.array(GI_w1_bt)  - np.array(GI_w2_bt)
         GI0_w1_leg, GII_w1_leg, GIN_w1_leg = GI_w1_leg - GI_w2_leg
         if verbose:
@@ -193,6 +195,7 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         boloI, anoptsI = test_objs(stack_I=True, lw=lw, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2)
         boloN, anoptsN = test_objs(stack_N=True, lw=lw, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2)
 
+        # pdb.set_trace()
         GS00 = fit[0]*(dsub/0.400)**(fit[3]+1)*lw/5
         GS0  = G_leg(fit, anopts0, bolo0, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=True)
         GW0  = G_leg(fit, anopts0, bolo0, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=True)
@@ -380,3 +383,43 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         plt.ylim(0, np.nanmax([G0_ds, GI_ds, GN_ds]))
         plt.grid(linestyle = '--', which='both', linewidth=0.5)   # grid lines on plot
         plt.legend()
+
+def test_widths(dsub=0.380, dSiOx=0.120, lw=7, w1w=6, w2w=4, dI1=0.5, dI2=0.6):
+    # test separation of the leg into various regions
+
+    # w_tiss =         [W2 slope, W2 edge, W1 slope, W1 edge]
+    w_tiss1 = np.array([0.1,      0.2,     0.3,      0.35])
+    # d_tiss =        [deltad_AW2, deltad_AW1, deltad_CW2, deltad_DW1, deltad_EW1]
+    d_tiss = np.array([0.1,        0.2,        0.15,       0.25,       0.125])
+
+    boloI0, anoptsI0 = test_objs(stack_I=True,                                lw=lw, dsub=dsub, w1w=w1w, w2w=w2w, dI1=dI1, dI2=dI2)   # no I stack thickness adjustments at W layer edges
+    boloI1, anoptsI1 = test_objs(stack_I=True, w_tiss=w_tiss1, d_tiss=d_tiss, lw=lw, dsub=dsub, w1w=w1w, w2w=w2w, dI1=dI1, dI2=dI2, tall_Istacks=True)   # no I stack thickness adjustments at W layer edges
+
+    # [deltad_AW2, deltad_AW1, deltad_CW2, deltad_DW1, deltad_EW1]               = boloI['geometry']['d_tiss'] if 'd_tiss' in boloI['geometry'] else [0, 0, 0, 0, 0]
+    region_ws0 = lw_regions(boloI0, anoptsI0); lw0, w2w_ns0, w1w_ns0, w2w_s0, w1w_s0, w2w_e0, w1w_e0, w2w_tot0, w1w_tot0, w_istack0 = region_ws0
+    region_ws1 = lw_regions(boloI1, anoptsI1); lw1, w2w_ns1, w1w_ns1, w2w_s1, w1w_s1, w2w_e1, w1w_e1, w2w_tot1, w1w_tot1, w_istack1 = region_ws1
+
+    assert lw0==lw, "lw != input lw"
+    assert lw1==lw, "lw != input lw"
+
+    assert w2w_ns1 == w2w_ns0 - w_tiss1[0], "W2 sloped region is not correctly separated from w2w"
+    assert w2w_s1  == w2w_s0  + w_tiss1[0], "W2 sloped region is not correctly separated from w2w"
+    assert w1w_ns1 == w1w_ns0 - w_tiss1[2], "W1 sloped region is not correctly separated from w1w"
+    assert w1w_s1  == w1w_s0  + w_tiss1[2], "W1 sloped region is not correctly separated from w1w"
+
+    assert w2w_ns1 + w2w_s1 == w2w, "w2w_ns + w2w_s = {} != w2w (= {})".format(w2w_ns1 + w2w_s1, w2w)# not correctly separated into sloped and non-sloped regions"
+    assert w1w_ns1 + w1w_s1 == w1w, "w1w_ns + w1w_s = {} != w1w (= {})".format(w1w_ns1 + w1w_s1, w1w)# not correctly separated into sloped and non-sloped regions"
+
+    ### test taller I stacks lead to large G values
+    test_fit = np.array([1, 1, 1, 0, 0, 1])   # test fit parameters
+    GI0_leg = G_leg(test_fit, anoptsI0, boloI0, 0, 0, dI1, 0, dI2, False, False, True, legA=True)
+    GI0_bt  = G_bolotest(test_fit, anoptsI0, boloI0, layer='I')[0]/4
+    GI1_leg = G_leg(test_fit, anoptsI1, boloI1, 0, 0, dI1, 0, dI2, False, False, True, legA=True)
+    GI1_bt  = G_bolotest(test_fit, anoptsI1, boloI1, layer='I')[0]/4
+
+    assert GI0_leg == GI0_bt, "GI_leg = {} != GI_bt = {}".format(round(GI0_leg, 2), round(GI0_bt, 2))
+    assert GI1_leg == GI1_bt, "GI_leg = {} != GI_bt = {}".format(round(GI1_leg, 2), round(GI1_bt, 2))
+    assert GI1_leg > GI0_leg, "GI_leg(taller I stacks) = {} !> GI_leg(nominal I stacks) = {}".format(round(GI1_leg, 2), round(GI0_leg, 2))
+    assert GI1_bt  > GI0_bt,  "GI_bt(taller I stacks)  = {} !> GI_bt(nominal I stacks)  = {}".format(round(GI1_bt,  2), round(GI0_bt,  2))
+
+    return
