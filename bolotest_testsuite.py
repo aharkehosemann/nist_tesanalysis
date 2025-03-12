@@ -301,10 +301,10 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         plt.plot(lwrange/2, GI_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
         plt.plot(lwrange/2, GN_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
         plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
-        plt.annotate('W2', (w2w/2-0.5, GN_lw[1]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
-        plt.annotate('W1', (w1w/2-0.5, GN_lw[1]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         if tall_Istacks:
             plt.vlines([np.array([w2w-w_tiss[0], w2w+w_tiss[1]])/2, np.array([w1w-w_tiss[2], w1w+w_tiss[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
+        plt.annotate('W2', (w2w/2-0.5, GN_lw[1]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
+        plt.annotate('W1', (w1w/2-0.5, GN_lw[1]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         if np.isfinite(Gmeas):
             plt.hlines([Gmeas], 0, max(lwrange)/2, linestyle='-.', alpha=0.5, color='r', label='G$_{meas}$')
         plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G [pW/K]')
@@ -318,6 +318,8 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         # plt.plot(lwrange/2, GIW_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
         # plt.plot(lwrange/2, GNW_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
         # plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
+        # if tall_Istacks:
+        #     plt.vlines([np.array([w2w-w_tiss[0], w2w+w_tiss[1]])/2, np.array([w1w-w_tiss[2], w1w+w_tiss[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
         # plt.annotate('W2', (w2w/2-0.3, GNW_lw[2]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         # plt.annotate('W1', (w1w/2-0.3, GNW_lw[2]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         # plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_W$ [pW/K]')
@@ -331,6 +333,8 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         # plt.plot(lwrange/2, GIS_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
         # plt.plot(lwrange/2, GNS_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
         # plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
+        # if tall_Istacks:
+        #     plt.vlines([np.array([w2w-w_tiss[0], w2w+w_tiss[1]])/2, np.array([w1w-w_tiss[2], w1w+w_tiss[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
         # plt.annotate('W2', (w2w/2-0.3, GIS_lw[1]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         # plt.annotate('W1', (w1w/2-0.3, GIS_lw[1]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         # plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_S$ [pW/K]')
@@ -345,6 +349,8 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         # plt.plot(lwrange/2, GII_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
         # plt.plot(lwrange/2, GNI_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
         # plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
+        # if tall_Istacks:
+        #     plt.vlines([np.array([w2w-w_tiss[0], w2w+w_tiss[1]])/2, np.array([w1w-w_tiss[2], w1w+w_tiss[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
         # plt.annotate('W2', (w2w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         # plt.annotate('W1', (w1w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         # plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_I$ [pW/K]')
@@ -359,6 +365,8 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         # plt.plot(lwrange/2, GIS_lw + GII_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
         # plt.plot(lwrange/2, GNS_lw + GNI_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
         # plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
+        # if tall_Istacks:
+        #     plt.vlines([np.array([w2w-w_tiss[0], w2w+w_tiss[1]])/2, np.array([w1w-w_tiss[2], w1w+w_tiss[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
         # plt.annotate('W2', (w2w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         # plt.annotate('W1', (w1w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         # plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_S$ + G$_I$ [pW/K]')

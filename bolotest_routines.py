@@ -252,11 +252,11 @@ def lw_regions(bolo, an_opts):
     w1w_tot = w1w_ns + w1w_s   # total width of W1
 
     if stack_I:   # i stacks begin after W2
-        w1_istack = w1w_ns - (w2w_ns + w2w_s + w2w_e)
+        w1_istack = w1w_ns - (w2w_tot + w2w_e)
         w_istack = w1_istack + w_istack_b   # total width of nominal I stacks
         w_sstack = 0   # total width of nominal S-I1-I2 stacks
     elif stack_N:
-        w1_istack = w1w_ns - (w2w_ns + w2w_s + w2w_e)
+        w1_istack = w1w_ns - (w2w_tot + w2w_e)
         w_istack = w1_istack  # total width of nominal I1-I2 stacks
         w_sstack = w_istack_b   # total width of nominal S-I1-I2 stacks
     else:   # I stacks begin after W1
@@ -294,17 +294,19 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
     [deltad_AW2, deltad_AW1, deltad_CW2, deltad_DW1, deltad_EW1] = bolo['geometry']['d_tiss'] if 'd_tiss' in bolo['geometry'] else [0, 0, 0, 0, 0]
     lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, w_istack, w_sstack = lw_regions(bolo, an_opts)
 
+    # hard code these thickness changes in for now
+    if legC:
+        dI1 = dI1 + 0.071
+        dI2 = dI2 + 0.063
+        # dI1 = dI1 + (0.351-0.284)
+
+    if legD:
+        # dS  = dS  - 0.021
+        dS  = dS  + (0.445 - 0.390)
+        # dW1 = dW1 + 0.009
+
     # I1 is trimmed outside of W2 width on legs A and C
     dI1I2 = dI1 + dI2 - I1trim if (legA or legC) else dI1 + dI2
-
-    # # hard code these thickness changes in for now
-    # if legC:
-    #     # dI1 = dI1 + 0.052
-    #     dI2 = dI2 + 0.034
-
-    # if legD:
-    #     dS  = dS  - 0.021
-    #     dW1 = dW1 + 0.009
 
     if model=='Two-Layer':   # treat S and I layers the same
 
