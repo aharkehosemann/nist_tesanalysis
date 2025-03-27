@@ -212,41 +212,41 @@ def lw_regions(bolo, an_opts):
     tall_Istacks = an_opts.get('tall_Istacks')
 
     w1w = bolo['geometry'].get('w1w'); w2w = bolo['geometry'].get('w2w')
-    lw  = bolo['geometry'].get('lw');  ll  = bolo['geometry'].get('ll')
+    lw  = bolo['geometry'].get('lw')
 
-    w_tiss = bolo['geometry'].get('w_tiss')   # widths of taller I stack regions
+    w_stacks = bolo['geometry'].get('w_stacks')   # widths of taller I stack regions
 
-    [tisw_2s, tisw_2, tisw_1s, tisw_1] = w_tiss if tall_Istacks else [0, 0, 0, 0]
+    [w2w_slope, w2w_edge, w1w_slope, w1w_edge] = w_stacks if tall_Istacks else [0, 0, 0, 0]
 
     if np.isscalar(lw):
         # sloped regions occupy edge of W layer
         # w2w = (w2 not sloped) + (w2 sloped)
 
         # W2 region layer widths
-        w2w_ns  = (w2w-tisw_2s) if lw > (w2w-tisw_2s) else lw   # width of W2 region before slope
-        w2w_s   = tisw_2s if lw>w2w else np.nanmax([lw-w2w_ns, 0])   # width of W2 sloped region
-        w2w_e   = tisw_2 if lw>(w2w+tisw_2) else np.nanmax([lw-w2w, 0])   # width of taller I layer(s) at edge of W2
+        w2w_ns  = (w2w-w2w_slope) if lw > (w2w-w2w_slope) else lw   # width of W2 region before slope
+        w2w_s   = w2w_slope if lw>w2w else np.nanmax([lw-w2w_ns, 0])   # width of W2 sloped region
+        w2w_e   = w2w_edge if lw>(w2w+w2w_edge) else np.nanmax([lw-w2w, 0])   # width of taller I layer(s) at edge of W2
 
         # W1 region layer widths
-        w1w_ns = (w1w-tisw_1s) if lw > (w1w-tisw_1s) else lw
-        w1w_s  = tisw_1s if lw>w1w else np.nanmax([lw-w1w_ns, 0])
-        w1w_e  = tisw_1 if lw>(w1w+tisw_1) else np.nanmax([lw-w1w, 0])   # width of taller I layer(s) at edge of W2
+        w1w_ns = (w1w-w1w_slope) if lw > (w1w-w1w_slope) else lw
+        w1w_s  = w1w_slope if lw>w1w else np.nanmax([lw-w1w_ns, 0])
+        w1w_e  = w1w_edge if lw>(w1w+w1w_edge) else np.nanmax([lw-w1w, 0])   # width of taller I layer(s) at edge of W2
 
         # nominal i stacks beyond tall ones after W2
-        w_istack_b  = (lw-w1w-tisw_1) if lw>(w1w+tisw_1) else 0
+        w_istack_b  = (lw-w1w-w1w_edge) if lw>(w1w+w1w_edge) else 0
 
     else:
         #        max value at lw > max value;    width between 0 and max;                            width before region begins = 0
-        w2w_ns = (w2w-tisw_2s)*np.ones(len(lw)); w2w_ns[lw<(w2w-tisw_2s)] = lw[lw<(w2w-tisw_2s)]
-        w2w_s  = tisw_2s*np.ones(len(lw));       w2w_s[lw<w2w]            = (lw-w2w_ns)[lw<w2w];       w2w_s[lw<(w2w-tisw_2s)] = 0   # if lw>w2w else np.nanmax(l[w-w2w_ns, 0])
-        w2w_e  = tisw_2*np.ones(len(lw));        w2w_e[lw<(w2w+tisw_2)]   = (lw-w2w)[lw<(w2w+tisw_2)]; w2w_e[lw<(w2w)] = 0           # if lw>w2w+tisw_2 else np.nanmax([lw-w2w, 0])
+        w2w_ns = (w2w-w2w_slope)*np.ones(len(lw)); w2w_ns[lw<(w2w-w2w_slope)] = lw[lw<(w2w-w2w_slope)]
+        w2w_s  = w2w_slope*np.ones(len(lw));       w2w_s[lw<w2w]            = (lw-w2w_ns)[lw<w2w];       w2w_s[lw<(w2w-w2w_slope)] = 0   # if lw>w2w else np.nanmax(l[w-w2w_ns, 0])
+        w2w_e  = w2w_edge*np.ones(len(lw));        w2w_e[lw<(w2w+w2w_edge)]   = (lw-w2w)[lw<(w2w+w2w_edge)]; w2w_e[lw<(w2w)] = 0           # if lw>w2w+w2w_edge else np.nanmax([lw-w2w, 0])
 
-        w1w_ns = (w1w-tisw_1s)*np.ones(len(lw)); w1w_ns[lw<(w1w-tisw_1s)] = lw[lw<(w1w-tisw_1s)]
-        w1w_s  = tisw_1s*np.ones(len(lw));       w1w_s[lw<w1w]            = (lw-w1w_ns)[lw<w1w];       w1w_s[lw<(w1w-tisw_1s)] = 0   # if lw>w1w else np.nanmax([lw-w1w_ns, 0])
-        w1w_e  = tisw_1*np.ones(len(lw));        w1w_e[lw<(w1w+tisw_1)]   = (lw-w1w)[lw<(w1w+tisw_1)]; w1w_e[lw<(w1w)] = 0 # if lw>w1w+tisw_1 else np.nanmax([lw-w1w, 0])
+        w1w_ns = (w1w-w1w_slope)*np.ones(len(lw)); w1w_ns[lw<(w1w-w1w_slope)] = lw[lw<(w1w-w1w_slope)]
+        w1w_s  = w1w_slope*np.ones(len(lw));       w1w_s[lw<w1w]            = (lw-w1w_ns)[lw<w1w];       w1w_s[lw<(w1w-w1w_slope)] = 0   # if lw>w1w else np.nanmax([lw-w1w_ns, 0])
+        w1w_e  = w1w_edge*np.ones(len(lw));        w1w_e[lw<(w1w+w1w_edge)]   = (lw-w1w)[lw<(w1w+w1w_edge)]; w1w_e[lw<(w1w)] = 0 # if lw>w1w+w1w_edge else np.nanmax([lw-w1w, 0])
 
         # nominal i stacks beyond tall ones after W1
-        w_istack_b  = lw-w1w-tisw_1; w_istack_b[lw<(w1w+tisw_1)] = 0
+        w_istack_b  = lw-w1w-w1w_edge; w_istack_b[lw<(w1w+w1w_edge)] = 0
 
     w2w_tot = w2w_ns + w2w_s   # total width of W2
     w1w_tot = w1w_ns + w1w_s   # total width of W1
@@ -287,26 +287,29 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
 
     ### geometry nuances, trimming I1 on legs A and C and handling thicker I layers near W layer edges
     I1trim   = bolo['geometry'].get('I1trim', 0)
-    # w_tiss    = bolo['geometry'].get('w_tiss')
-    # d_tiss    = bolo['geometry'].get('d_tiss')   # extra dI1 in region next to W2 on Legs A and C
-    # d_tiss    = bolo['geometry'].get('d_tiss')   # extra dI1 in region next to W2 on Legs A and C
+    # w_stacks    = bolo['geometry'].get('w_stacks')
+    # d_stacks    = bolo['geometry'].get('d_stacks')   # extra dI1 in region next to W2 on Legs A and C
+    # d_stacks    = bolo['geometry'].get('d_stacks')   # extra dI1 in region next to W2 on Legs A and C
 
-    [deltad_AW2, deltad_AW1, deltad_CW2, deltad_DW1, deltad_EW1] = bolo['geometry']['d_tiss'] if 'd_tiss' in bolo['geometry'] else [0, 0, 0, 0, 0]
-    lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, w_istack, w_sstack = lw_regions(bolo, an_opts)
 
     # hard code these thickness changes in for now
     if legC:
         dI1 = dI1 + 0.071
         dI2 = dI2 + 0.063
-        # dI1 = dI1 + (0.351-0.284)
+        bolo['geometry']['w2w'] = bolo['geometry']['w1w']
 
-    if legD:
-        # dS  = dS  - 0.021
-        dS  = dS  + (0.445 - 0.390)
-        # dW1 = dW1 + 0.009
+    # if legD:
+    #     # dS  = dS  - 0.021
+    #     dS  = dS  + (0.445 - 0.390)
+    #     # dW1 = dW1 + 0.009
+
+    dI1I2 = dI1 + dI2 - I1trim if legC else dI1 + dI2
+    # if (legA or legC or legD): bolo['geometry']['lw'] = bolo['geometry']['lw']-0.400   # widths of these legs are ~400 nm less
+
+    [deltad_AW2, deltad_AW1, deltad_CW2, deltad_DW1, deltad_EW1] = bolo['geometry']['d_stacks'] if 'd_stacks' in bolo['geometry'] else [0, 0, 0, 0, 0]
+    lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, w_istack, w_sstack = lw_regions(bolo, an_opts)
 
     # I1 is trimmed outside of W2 width on legs A and C
-    dI1I2 = dI1 + dI2 - I1trim if (legA or legC) else dI1 + dI2
 
     if model=='Two-Layer':   # treat S and I layers the same
 
@@ -400,17 +403,19 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             # I1 and I2 are separate to W2 width; I1-I2 stacked beyond W2 width
             # extra d on slope and edge (becomes I1-I2 stack) of W2
             G_I1       = G_layer(fit, dI1,              layer='I', model=model) * (w2w_tot/5)  * a_factor * include_I
-            G_I2_ns    = G_layer(fit, dI2,              layer='I', model=model) * (w2w_ns/5)   * a_factor * include_I
-            G_I2_s     = G_layer(fit, dI2  +deltad_AW2, layer='I', model=model) * (w2w_s/5)    * a_factor * include_I
+            # G_I2_ns    = G_layer(fit, dI2,              layer='I', model=model) * (w2w_ns/5)   * a_factor * include_I
+            # G_I2_s     = G_layer(fit, dI2  +deltad_AW2, layer='I', model=model) * (w2w_s/5)    * a_factor * include_I
+            G_I2       = G_layer(fit, dI2  +deltad_AW2, layer='I', model=model) * ((w2w_tot+w2w_e)/5)    * a_factor * include_I
             G_I1I2_w2e = G_layer(fit, dI1I2+deltad_AW2, layer='I', model=model) * (w2w_e/5)    * a_factor * include_I   # taller I stack next to W2
 
             # extra d on slope and edge of W1
             # G_I1I2_ns  = G_layer(fit, dI1I2,            layer='I', model=model) * (w1w_ns/5)   * a_factor * include_I
-            G_I1I2_nom = G_layer(fit, dI1I2,            layer='I', model=model) * (w_istack/5) * a_factor * include_I   # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
             G_I1I2_s   = G_layer(fit, dI1I2+deltad_AW1, layer='I', model=model) * (w1w_s/5)    * a_factor * include_I
             G_I1I2_w1e = G_layer(fit, dI1I2+deltad_AW1, layer='I', model=model) * (w1w_e/5)    * a_factor * include_I
+            G_I1I2_nom = G_layer(fit, dI1I2,            layer='I', model=model) * (w_istack/5) * a_factor * include_I   # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
 
-            G_I     = G_I1 + G_I2_ns + G_I2_s + G_I1I2_w2e + G_I1I2_s + G_I1I2_w1e + G_I1I2_nom
+            # G_I     = G_I1 + G_I2_ns + G_I2_s + G_I1I2_w2e + G_I1I2_s + G_I1I2_w1e + G_I1I2_nom
+            G_I     = G_I1 + G_I2 + G_I1I2_w2e + G_I1I2_s + G_I1I2_w1e + G_I1I2_nom
 
         elif legB:   # S-W1-I1-W2
 
@@ -427,21 +432,24 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
         elif legC:   # S-I1-W2-I2
             G_S    = G_layer(fit, dS, layer='S', model=model)      * lw/5         * a_factor * include_S   # substrate still treated as separate layer
 
-            G_W2   = G_layer(fit, dW2, layer='W', model=model)     * (w2w_tot/5)     * a_factor * include_W
+            G_W2   = G_layer(fit, dW2, layer='W', model=model)     * (w2w_tot/5)  * a_factor * include_W
             G_W    = G_W2
 
-            # I1 and I2 are separate to W2 width; I1-I2 stacked beyond W2 width
+            # I1 and I2 are separate to W2 width (changed to w1w earlier in this function); I1-I2 stacked beyond W2 width
             # extra d on slope and edge (becomes I1-I2 stack) of W2
-            G_I1       = G_layer(fit, dI1,              layer='I', model=model) * (w2w_tot/5) * a_factor * include_I
-            G_I2_ns    = G_layer(fit, dI2,              layer='I', model=model) * (w2w_ns/5) * a_factor * include_I
-            G_I2_s     = G_layer(fit, dI2+deltad_CW2,   layer='I', model=model) * (w2w_s/5)  * a_factor * include_I
-            G_I1I2_w2e = G_layer(fit, dI1I2+deltad_CW2, layer='I', model=model) * (w2w_e/5)  * a_factor * include_I   # taller I stack next to W2
+            G_I1       = G_layer(fit, dI1,                layer='I', model=model) * (w2w_tot/5) * a_factor * include_I
+            # G_I2_ns    = G_layer(fit, dI2,                layer='I', model=model) * (w2w_ns/5)  * a_factor * include_I
+            # G_I2_s     = G_layer(fit, dI2+deltad_CW2,     layer='I', model=model) * (w2w_s/5)   * a_factor * include_I
+            G_I2       = G_layer(fit, dI2,     layer='I', model=model) * (w2w_tot+w2w_e/5)   * a_factor * include_I
 
-            # nominal I stacks beyond W2 edge
-            w_istack_legC = w_istack + w1w_s + w1w_e
+            # nominal I stacks beyond W2 edge, deltad_CW2 doesn't include extended I2 past W2
+            # w_istack_legC = w_istack + w1w_s + w1w_e
+            w_istack_legC = lw - w2w_tot - w2w_e
+            G_I1I2_w2e = G_layer(fit, dI1+dI2+deltad_CW2, layer='I', model=model) * (w2w_e/5)   * a_factor * include_I   # taller I stack next to W2
             G_I1I2_nom = G_layer(fit, dI1I2,            layer='I', model=model) * (w_istack_legC/5)  * a_factor * include_I
 
-            G_I      = G_I1 + G_I2_ns + G_I2_s + G_I1I2_w2e + G_I1I2_nom
+            # G_I      = G_I1 + G_I2_ns + G_I2_s + G_I1I2_w2e + G_I1I2_nom
+            G_I      = G_I1 + G_I2 + G_I1I2_w2e + G_I1I2_nom
 
         elif legD:   # S-W1-I1-I2
 
@@ -451,12 +459,14 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             G_W    = G_W1
 
             # I1-I2 stacked across entire leg, nominal height includes W2 edge and slope
-            w_istack_legD = lw
+            # w_istack_legD = lw
+            w_istack_legD = lw - w1w_e
             G_I1I2_nom = G_layer(fit, dI1I2,            layer='I', model=model) * (w_istack_legD/5) * a_factor * include_I   # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
-            G_I1I2_s   = G_layer(fit, dI1I2+deltad_DW1, layer='I', model=model) * (w1w_s/5)         * a_factor * include_I
+            # G_I1I2_s   = G_layer(fit, dI1I2+deltad_DW1, layer='I', model=model) * (w1w_s/5)         * a_factor * include_I
             G_I1I2_w1e = G_layer(fit, dI1I2+deltad_DW1, layer='I', model=model) * (w1w_e/5)         * a_factor * include_I
 
-            G_I    = G_I1I2_nom + G_I1I2_s + G_I1I2_w1e
+            # G_I    = G_I1I2_nom + G_I1I2_s + G_I1I2_w1e
+            G_I    = G_I1I2_nom + G_I1I2_w1e
 
         elif legE:   # S-W1-W2
 
@@ -549,7 +559,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             # nominal I stacks beyond W2 edge
             w_sstack_legC = w_istack + w_sstack + w1w_s + w1w_e
             # G_I1I2_nom = G_layer(fit, dI1I2, layer='I', model=model) * (w_sstack_legC/5)  * a_factor * include_I
-            G_SiNxI1I2_nom = G_layer(fit, dSiNx+dI1I2, layer='I', model=model) * (w_sstack_legC/5)   * a_factor * include_I   # taller I stack next to W2
+            G_SiNxI1I2_nom = G_layer(fit, dSiNx+dI1+dI2, layer='I', model=model) * (w_sstack_legC/5)   * a_factor * include_I   # taller I stack next to W2
 
             G_I        =  G_SiNxI1 + G_I2 + G_SiNxI1I2_w2e + G_SiNxI1I2_nom
 
@@ -642,7 +652,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             G_I2_ns    = G_layer(fit, dI2,            layer='I', model=model) * ((w1w_tot-(w2w_s+w2w_e))/5) * a_factor * include_I
 
             w_istack_legC = w_istack + w1w_e
-            G_I1I2     = G_layer(fit, dI1I2, layer='I', model=model) * (w_istack_legC/5)  * a_factor * include_I
+            G_I1I2     = G_layer(fit, dI1+dI2, layer='I', model=model) * (w_istack_legC/5)  * a_factor * include_I
 
             G_I    = G_I1 + G_I2_se + G_I2_ns + G_I1I2
 
