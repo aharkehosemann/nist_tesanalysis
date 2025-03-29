@@ -2,7 +2,7 @@
 from bolotest_routines import *
 
 ### testing suite - test model output
-def test_objs(lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0, dI1=0, dW2=0, dI2=0, d_tiss=np.array([0, 0, 0, 0, 0]), w_tiss=np.array([0, 0, 0, 0]),
+def test_objs(lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0, dI1=0, dW2=0, dI2=0, d_stacks=np.array([0, 0, 0, 0]), w_stacks=np.array([0, 0, 0, 0, 0]),
                 model='Three-Layer', stack_I=False, stack_N=False, tall_Istacks=False, constrained=False, supG=0.0, calc='Median'):
     ### create dummy objects for testing
 
@@ -11,7 +11,7 @@ def test_objs(lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0, dI1=0,
     test_bolo = {}; test_bolo['geometry'] = {}
     test_bolo['geometry']['ll']       = ll   # [um] bolotest leg length
     test_bolo['geometry']['lw']       = lw   # [um] bolotest leg width
-    test_bolo['geometry']['layer_ds'] = np.array([dsub, dsub, dsub, dsub, dW1, dW1, dI1, dI1, dW2, dW2, dI2])
+    test_bolo['geometry']['layer_ds'] = np.array([dsub, dsub, dsub, dsub, dsub, dsub, dW1, dW1, dI1, dI1, dI1, dW2, dW2, dI2, dI2, dI2])
     test_bolo['geometry']['dsub']     = dsub   # dS for leg A
     test_bolo['geometry']['w1w']      = w1w   # [um] W1 width
     test_bolo['geometry']['w2w']      = w2w   # [um] W2 width
@@ -19,8 +19,8 @@ def test_objs(lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0, dI1=0,
     test_bolo['geometry']['dI1']      = dI1; test_bolo['geometry']['dI2'] = dI2   # [um] leg A film thicknesses
     test_bolo['geometry']['La']       = ll;  test_bolo['geometry']['acoustic_Lscale'] = True   # bolotest acoustic length - shouldn't matter because acoustic scaling ratio should be 1
     test_bolo['geometry']['dSiOx']    = dSiOx   # [um] SiOx thickness of substrate layer
-    test_bolo['geometry']['d_tiss']   = d_tiss   # [um] layer thickness adjustments near W1 and W2 edges
-    test_bolo['geometry']['w_tiss']   = w_tiss   # [um] widths of layer thickness adjustment regions
+    test_bolo['geometry']['d_stacks'] = d_stacks   # [um] layer thickness adjustments near W1 and W2 edges
+    test_bolo['geometry']['w_stacks'] = w_stacks   # [um] widths of layer thickness adjustment regions
 
     test_anopts = {}
     test_anopts['stack_I']        = stack_I   # account for I1-I2 stacks in areas wider than W2
@@ -190,7 +190,7 @@ def test_alphascaleI(verbose=False):
 def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0.200, dI1=0.400, dW2=0.350, dI2=0.400,
                     manual_calc = False, plot_vwidth=False, lwrange=np.arange(5,40), plot_vdsub=False, dsrange=np.arange(0.400, 2.500),
                     legA=False, legB=False, legC=False, legD=False, legE=False, legF=False, legG=False,
-                    verbose=False, tall_Istacks=False, d_tiss=np.array([0, 0, 0, 0, 0]), w_tiss=np.array([0, 0, 0, 0])):
+                    verbose=False, tall_Istacks=False, d_stacks=np.array([0, 0, 0, 0]), w_stacks=np.array([0, 0, 0, 0, 0])):
     # compare output between I-layer stacking at w > w1w ("no stacking / status quo / 0"), I-layer stacking at w > w2w, and nitride stacking
     # can look at different outputs for different legs vs width or thickness
     # manual_calc currently only works for leg A
@@ -275,21 +275,21 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
 
     if plot_vwidth:
 
-        bolo0_lw, anopts0_lw = test_objs(lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_tiss=w_tiss, d_tiss=d_tiss, tall_Istacks=tall_Istacks)
+        bolo0_lw, anopts0_lw = test_objs(lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks)
         G0_lw  = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
         G0S_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
         G0W_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
         G0I_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
         assert all([G >= 0 for G in np.array([G0_lw, G0S_lw, G0W_lw, G0I_lw]).flat]), "G < 0"
 
-        # boloI_lw, anoptsI_lw = test_objs(stack_I=True, lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_tiss=w_tiss, d_tiss=d_tiss, tall_Istacks=tall_Istacks)
+        # boloI_lw, anoptsI_lw = test_objs(stack_I=True, lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks)
         # GI_lw  = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
         # GIS_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
         # GIW_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
         # GII_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
         # assert all([G >= 0 for G in np.array([GI_lw, GIS_lw, GIW_lw, GII_lw]).flat]), "G < 0"
 
-        # boloN_lw, anoptsN_lw = test_objs(stack_N=True, lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_tiss=w_tiss, d_tiss=d_tiss, tall_Istacks=tall_Istacks)
+        # boloN_lw, anoptsN_lw = test_objs(stack_N=True, lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks)
         # GN_lw  = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
         # GNS_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
         # GNW_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG)
@@ -302,7 +302,7 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         # plt.plot(lwrange/2, GN_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
         # plt.vlines([w2w/2, w1w/2, lw/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
         # if tall_Istacks:
-        #     plt.vlines([np.array([w2w-w_tiss[0], w2w+w_tiss[1]])/2, np.array([w1w-w_tiss[2], w1w+w_tiss[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
+        #     plt.vlines([np.array([w2w-w_stacks[0], w2w+w_stacks[1]])/2, np.array([w1w-w_stacks[2], w1w+w_stacks[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
         # plt.annotate('W2', (w2w/2-0.5, GN_lw[1]))
         # plt.annotate('W1', (w1w/2-0.5, GN_lw[1]))
         # plt.annotate('leg', (lw/2-0.15,  GN_lw[1]))
@@ -320,7 +320,7 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         # plt.plot(lwrange/2, GNW_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
         # plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
         # if tall_Istacks:
-        #     plt.vlines([np.array([w2w-w_tiss[0], w2w+w_tiss[1]])/2, np.array([w1w-w_tiss[2], w1w+w_tiss[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
+        #     plt.vlines([np.array([w2w-w_stacks[0], w2w+w_stacks[1]])/2, np.array([w1w-w_stacks[2], w1w+w_stacks[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
         # plt.annotate('W2', (w2w/2-0.3, GNW_lw[2]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         # plt.annotate('W1', (w1w/2-0.3, GNW_lw[2]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         # plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_W$ [pW/K]')
@@ -335,7 +335,7 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         # plt.plot(lwrange/2, GNS_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
         # plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
         # if tall_Istacks:
-        #     plt.vlines([np.array([w2w-w_tiss[0], w2w+w_tiss[1]])/2, np.array([w1w-w_tiss[2], w1w+w_tiss[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
+        #     plt.vlines([np.array([w2w-w_stacks[0], w2w+w_stacks[1]])/2, np.array([w1w-w_stacks[2], w1w+w_stacks[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
         # plt.annotate('W2', (w2w/2-0.3, GIS_lw[1]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         # plt.annotate('W1', (w1w/2-0.3, GIS_lw[1]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         # plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_S$ [pW/K]')
@@ -351,7 +351,7 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         # plt.plot(lwrange/2, GNI_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
         # plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
         # if tall_Istacks:
-        #     plt.vlines([np.array([w2w-w_tiss[0], w2w+w_tiss[1]])/2, np.array([w1w-w_tiss[2], w1w+w_tiss[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
+        #     plt.vlines([np.array([w2w-w_stacks[0], w2w+w_stacks[1]])/2, np.array([w1w-w_stacks[2], w1w+w_stacks[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
         # plt.annotate('W2', (w2w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         # plt.annotate('W1', (w1w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         # plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_I$ [pW/K]')
@@ -367,7 +367,7 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         # plt.plot(lwrange/2, GNS_lw + GNI_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
         # plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
         # if tall_Istacks:
-        #     plt.vlines([np.array([w2w-w_tiss[0], w2w+w_tiss[1]])/2, np.array([w1w-w_tiss[2], w1w+w_tiss[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
+        #     plt.vlines([np.array([w2w-w_stacks[0], w2w+w_stacks[1]])/2, np.array([w1w-w_stacks[2], w1w+w_stacks[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
         # plt.annotate('W2', (w2w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         # plt.annotate('W1', (w1w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
         # plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_S$ + G$_I$ [pW/K]')
@@ -403,17 +403,20 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
 def test_widths(dsub=0.380, dSiOx=0.120, lw=7, w1w=6, w2w=4, dI1=0.5, dI2=0.6, stack_I=False, stack_N=False):
     # test separation of the leg into various regions
 
-    # w_tiss =         [W2 slope, W2 edge, W1 slope, W1 edge]
-    w_tiss1 = np.array([0.1,      0.2,     0.3,      0.35])
-    # d_tiss =        [deltad_AW2, deltad_AW1, deltad_CW2, deltad_DW1, deltad_EW1]
-    d_tiss = np.array([0.1,       0.2,        0.15,       0.25,       0.125])
+    # w_stacks =         [W2 slope, W2 edge, W1 slope, W1 edge, I2 extension]
+    # w_stacks1 = np.array([0.1,      0.2,     0.3,      0.35])
+    w_stacks1 = np.array([0.1,      0.2,     0.3,      0.35,    0.125])
+    # d_stacks =        [deltad_AW2, deltad_AW1, deltad_CW2, deltad_DW1]
+    d_stacks  = np.array([0.1,       0.2,        0.15,       0.25])
 
-    bolo0, anopts0 = test_objs(                   stack_I=stack_I, stack_N=stack_N, lw=lw, dsub=dsub, w1w=w1w, w2w=w2w, dI1=dI1, dI2=dI2, w_tiss=w_tiss1, d_tiss=d_tiss)   # no  I layer thickness adjustments at W layer edges
-    bolo1, anopts1 = test_objs(tall_Istacks=True, stack_I=stack_I, stack_N=stack_N, lw=lw, dsub=dsub, w1w=w1w, w2w=w2w, dI1=dI1, dI2=dI2, w_tiss=w_tiss1, d_tiss=d_tiss)   # yes I layer thickness adjustments at W layer edges
+    bolo0, anopts0 = test_objs(                   stack_I=stack_I, stack_N=stack_N, lw=lw, dsub=dsub, w1w=w1w, w2w=w2w, dI1=dI1, dI2=dI2, w_stacks=w_stacks1, d_stacks=d_stacks)   # no  I layer thickness adjustments at W layer edges
+    bolo1, anopts1 = test_objs(tall_Istacks=True, stack_I=stack_I, stack_N=stack_N, lw=lw, dsub=dsub, w1w=w1w, w2w=w2w, dI1=dI1, dI2=dI2, w_stacks=w_stacks1, d_stacks=d_stacks)   # yes I layer thickness adjustments at W layer edges
 
-    # [deltad_AW2, deltad_AW1, deltad_CW2, deltad_DW1, deltad_EW1]               = boloI['geometry']['d_tiss'] if 'd_tiss' in boloI['geometry'] else [0, 0, 0, 0, 0]
-    region_ws0 = lw_regions(bolo0, anopts0); lw0, w2w_ns0, w1w_ns0, w2w_s0, w1w_s0, w2w_e0, w1w_e0, w2w_tot0, w1w_tot0, w_istack0, w_sstack0 = region_ws0
-    region_ws1 = lw_regions(bolo1, anopts1); lw1, w2w_ns1, w1w_ns1, w2w_s1, w1w_s1, w2w_e1, w1w_e1, w2w_tot1, w1w_tot1, w_istack1, w_sstack1 = region_ws1
+    # [deltad_AW2, deltad_AW1, deltad_CW2, deltad_DW1, deltad_EW1]               = boloI['geometry']['d_stacks'] if 'd_stacks' in boloI['geometry'] else [0, 0, 0, 0, 0]
+    # region_ws0 = lw_regions(bolo0, anopts0); lw0, w2w_ns0, w1w_ns0, w2w_s0, w1w_s0, w2w_e0, w1w_e0, w2w_tot0, w1w_tot0, w_istack0, w_sstack0 = region_ws0
+    # region_ws1 = lw_regions(bolo1, anopts1); lw1, w2w_ns1, w1w_ns1, w2w_s1, w1w_s1, w2w_e1, w1w_e1, w2w_tot1, w1w_tot1, w_istack1, w_sstack1 = region_ws1
+    region_ws0 = lw_regions(bolo0, anopts0); lw0, w2w_ns0, w1w_ns0, w2w_s0, w1w_s0, w2w_e0, w1w_e0, w2w_tot0, w1w_tot0, w_istack0, w_sstack0, wI2_ext0, wI1I2_ext0 = region_ws0
+    region_ws1 = lw_regions(bolo1, anopts1); lw1, w2w_ns1, w1w_ns1, w2w_s1, w1w_s1, w2w_e1, w1w_e1, w2w_tot1, w1w_tot1, w_istack1, w_sstack1, wI2_ext1, wI1I2_ext1 = region_ws1
 
     assert lw0==lw, "lw != input lw"
     assert lw1==lw, "lw != input lw"
@@ -421,10 +424,10 @@ def test_widths(dsub=0.380, dSiOx=0.120, lw=7, w1w=6, w2w=4, dI1=0.5, dI2=0.6, s
     assert all([w >= 0 for w in np.array(region_ws0).flat]), "w < 0"
     assert all([w >= 0 for w in np.array(region_ws1).flat]), "w < 0"
 
-    assert w2w_ns1 == w2w_ns0 - w_tiss1[0], "W2 sloped region is not correctly separated from w2w"
-    assert w2w_s1  == w2w_s0  + w_tiss1[0], "W2 sloped region is not correctly separated from w2w"
-    assert w1w_ns1 == w1w_ns0 - w_tiss1[2], "W1 sloped region is not correctly separated from w1w"
-    assert w1w_s1  == w1w_s0  + w_tiss1[2], "W1 sloped region is not correctly separated from w1w"
+    assert w2w_ns1 == w2w_ns0 - w_stacks1[0], "W2 sloped region is not correctly separated from w2w"
+    assert w2w_s1  == w2w_s0  + w_stacks1[0], "W2 sloped region is not correctly separated from w2w"
+    assert w1w_ns1 == w1w_ns0 - w_stacks1[2], "W1 sloped region is not correctly separated from w1w"
+    assert w1w_s1  == w1w_s0  + w_stacks1[2], "W1 sloped region is not correctly separated from w1w"
 
     assert w2w_tot0 == w2w, "w2w_tot = {} != w2w (= {})".format(w2w_tot0, w2w)# not correctly separated into sloped and non-sloped regions"
     assert w1w_tot0 == w1w, "w1w_tot = {} != w1w (= {})".format(w1w_tot0, w1w)# not correctly separated into sloped and non-sloped regions"
@@ -437,7 +440,9 @@ def test_widths(dsub=0.380, dSiOx=0.120, lw=7, w1w=6, w2w=4, dI1=0.5, dI2=0.6, s
     ### test taller I stacks lead to large G values
     test_fit = np.array([1, 1, 1, 0, 0, 1])   # test fit parameters
     G0_leg  = G_leg(     test_fit, anopts0, bolo0, dsub, 0, dI1, 0, dI2, False, False, True, legA=True)
+    # G_legA  = G_leg(     fit, an_opts, bolo, dS_ABD, dW1_ABD, dI1_AB, dW2_AC, dI2_A, include_S, include_W, include_I, legA=True)   # S-W1-I1-W2-I2
     G0_bt   = G_bolotest(test_fit, anopts0, bolo0, layer='I')[0]/4
+    # G0_bt  = G_leg(     test_fit, anopts0, bolo0, dsub, 0, dI1, 0, dI2, False, False, True, legA=True)
     G1_leg  = G_leg(     test_fit, anopts1, bolo1, dsub, 0, dI1, 0, dI2, False, False, True, legA=True)
     G1_bt   = G_bolotest(test_fit, anopts1, bolo1, layer='I')[0]/4
 
