@@ -276,7 +276,6 @@ def lw_regions(bolo, an_opts):
 def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, include_I, dI1I2=0., supG_width=0.,
           legA=False, legB=False, legC=False, legD=False, legE=False, legF=False, legG=False):
 
-    bolo_calcG   = copy.deepcopy(bolo)   # copy bolo dictionary to avoid overwriting
     beta         = 1.   # power law exponent for width scaling
     model        = an_opts.get('model')
     stack_I      = an_opts.get('stack_I')
@@ -284,8 +283,14 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
     supG         = an_opts.get('supG', 0.0)
     tall_Istacks = an_opts.get('tall_Istacks')
     extend_I2    = an_opts.get('extend_I2', False)
-    deltalw_AD   = bolo['geometry'].get('deltalw_AD', 0.0)   # width difference for legs A and D
 
+    # leg-specific geometry adjustments
+    deltalw_AD   = bolo['geometry'].get('deltalw_AD',   0.0)   # width difference for legs A and D
+    deltalw_C    = bolo['geometry'].get('deltalw_C',    0.0)   # width difference for legs A and D
+    deltawI1I2_A = bolo['geometry'].get('deltawI1I2_A', 0.0)   # width difference for legs A and D
+    deltadI1I2_A = bolo['geometry'].get('deltadI1I2_A', 0.0)   # width difference for legs A and D
+
+    bolo_calcG   = copy.deepcopy(bolo)   # copy bolo dictionary to avoid overwriting
     # scale with L and d in diffuse / ballistic transition
     if bolo_calcG['geometry'].get('acoustic_Lscale'):   # use acoustic scaling
         a_factor = acoust_factor(bolo_calcG)
@@ -294,21 +299,28 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
         ll       = bolo_calcG['geometry'].get('ll')
         a_factor = (220/ll)**pLscale
 
-    ### geometry nuances, trimming I1 on legs A and C and handling thicker I layers near W layer edges
+    ### leg-specific geometry adjustments
 
-    if legC: bolo_calcG['geometry']['w2w'] = bolo_calcG['geometry']['w1w']
-    dI1I2 = dI1I2 if legC else dI1 + dI2
-    # if (legA or legD): bolo_calcG['geometry']['lw'] = bolo['geometry']['lw'] + deltalw_AD    # widths of legs A and D may be different
+    # thickness of I1-I2 stacks
+    if legA:
+        dI1I2 = dI1 + dI2 + deltadI1I2_A
+    elif legC:
+        bolo_calcG['geometry']['w2w'] = bolo_calcG['geometry']['w1w']
+    else:
+        dI1I2 = dI1 + dI2
 
+    # different leg widths on different legs
     lw0 = bolo['geometry']['lw']
-    if (legA or legD):
+    # if (legA or legD or legC):
+    if (legA or legD or legB or legC):
         if np.isscalar(lw0):
-            lw_calcG = np.nanmax([lw0+deltalw_AD, 0])    # widths of legs A and D may be different
+            lw_calcG = np.nanmax([lw0+deltalw_C, 0]) if (legC) else np.nanmax([lw0+deltalw_AD, 0])   # widths of legs A and D may be different
         else:
-            lw_calcG = (lw0+deltalw_AD); lw_calcG[lw_calcG<0] = 0
+            lw_calcG = (lw0+deltalw_C) if (legC) else (lw0+deltalw_AD)
+            lw_calcG[lw_calcG<0] = 0
         bolo_calcG['geometry']['lw'] = lw_calcG
 
-    # [deltad_AW2, deltad_AW1, deltad_CW2, deltad_DW1, deltad_EW1] = bolo_calcG['geometry']['d_stacks'] if 'd_stacks' in bolo_calcG['geometry'] else [0, 0, 0, 0, 0]
+    # layer thicknesses and widths
     [deltad_AW2, deltad_AW1, deltad_CW2, deltad_DW1] = bolo_calcG['geometry']['d_stacks'] if 'd_stacks' in bolo_calcG['geometry'] else [0, 0, 0, 0]
     lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, w_istack, w_sstack, wI2_ext, wI1I2_ext = lw_regions(bolo_calcG, an_opts)
 
@@ -397,35 +409,79 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
 
         if legA:   # S-W1-I1-W2-I2
 
+
+            # elif extend_I2:
+            #     # I2 nominal out to extended, tall on w2w_e, and nominal between w2w_e and w1w_tot
+            #     GI2_nom_ext = G_layer(fit, dI2,            layer='I', model=model) * wI2_ext/5                   * a_factor * include_I
+            #     GI2_nom_W1  = G_layer(fit, dI2,            layer='I', model=model) * (w1w_tot-(w2w_tot+w2w_e))/5 * a_factor * include_I
+            #     GI2_w2e     = G_layer(fit, dI2+deltad_AW2, layer='I', model=model) * w2w_e/5                     * a_factor * include_I
+            #     G_I2        = GI2_nom_ext + GI2_nom_W1 + GI2_w2e
+
+            #     # I1I2 nominal for rest of leg = lw - w1w_tot
+            #     G_I1I2      = G_layer(fit, dI1I2, layer='I', model=model) * (lw-w1w_tot+deltawI1I2_A)/5 * a_factor * include_I
+
+            # else:   # I2 nominal out to w1w_tot, I1I2 nominal for rest of leg
+            #     G_I2  = G_layer(fit, dI2, layer='I', model=model)   * w1w_tot/5      * a_factor * include_I
+            #     G_I1I2 = G_layer(fit, dI1I2, layer='I', model=model) * (lw-w1w_tot)/5 * a_factor * include_I
+
+
+
+            ### same as no stacks
+            # G_S    = G_layer(fit, dS, layer='S', model=model)    * lw/5         * a_factor * include_S   # substrate still treated as separate layer
             G_S  = G_layer(fit, dS, layer='S', model=model)  * lw/5      * a_factor * include_S   # substrate still treated as separate layer
 
+            # G_W2   = G_layer(fit, dW2, layer='W', model=model)   * w2w_tot/5     * a_factor * include_W
+            # G_W1   = G_layer(fit, dW1, layer='W', model=model)   * w1w_tot/5     * a_factor * include_W
+            # G_W    = G_W1 + G_W2
             G_W2 = G_layer(fit, dW2, layer='W', model=model) * w2w_tot/5 * a_factor * include_W
             G_W1 = G_layer(fit, dW1, layer='W', model=model) * w1w_tot/5 * a_factor * include_W
             G_W  = G_W1 + G_W2
 
+            ### different from no stacks
+            # # I1 and I2 separate to W1 width, stacked beyond W1
+            # G_I1 = G_layer(fit, dI1, layer='I', model=model) * w1w_tot/5     * a_factor * include_I
             # I1 and I2 are separate to W2 width; I1-I2 stacked beyond W2 width
-            # extra d on slope and edge (becomes I1-I2 stack) of W2
             G_I1 = G_layer(fit, dI1, layer='I', model=model) * w2w_tot/5  * a_factor * include_I
 
             if tall_Istacks:
-                # I2 is nom on w2w_ns, tall on w2w_s
-                GI2_w2ns = G_layer(fit, dI2,            layer='I', model=model) * w2w_ns/5 * a_factor * include_I
-                GI2_w2s  = G_layer(fit, dI2+deltad_AW2, layer='I', model=model) * w2w_s/5  * a_factor * include_I
-                G_I2     = GI2_w2ns + GI2_w2s
+                if stack_I:
+                    G_I1 = G_layer(fit, dI1, layer='I', model=model) * w2w_tot/5  * a_factor * include_I
 
-                # I1I2 tall on w2w_e, w1w_s, and w1w_e; nominal for rest of leg = lw - (w2w_tot + w2w_e + w1w_s + w1w_e)
-                wI1I2_nom  = lw - (w2w_tot + w2w_e + w1w_s + w1w_e)
-                GI1I2_nom  = G_layer(fit, dI1I2,            layer='I', model=model) * wI1I2_nom/5     * a_factor * include_I   # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
-                GI1I2_w2e  = G_layer(fit, dI1I2+deltad_AW2, layer='I', model=model) * w2w_e/5         * a_factor * include_I   # taller I stack next to W2
-                GI1I2_w1se = G_layer(fit, dI1I2+deltad_AW1, layer='I', model=model) * (w1w_s+w1w_e)/5 * a_factor * include_I
-                G_I1I2     = GI1I2_nom + GI1I2_w2e + GI1I2_w1se
+                    # I2 is nom on w2w_ns, tall on w2w_s
+                    GI2_nom  = G_layer(fit, dI2,            layer='I', model=model) * w2w_ns/5 * a_factor * include_I
+                    GI2_w2s  = G_layer(fit, dI2+deltad_AW2, layer='I', model=model) * w2w_s/5  * a_factor * include_I
+                    G_I2     = GI2_nom + GI2_w2s
+                else:   # no stacks - shouldn't be accessed right now
+                    # I2 tall on w2w_s, w2w_e, and w1w_s
+                    GI2_w2se = G_layer(fit, dI2+deltad_AW2, layer='I', model=model) * (w2w_s+w2w_e)/5 * a_factor * include_I   # add extra I2 on W2 slope and edge but keep I1 and I2 separate
+                    GI2_w1s  = G_layer(fit, dI2+deltad_AW1, layer='I', model=model) * w1w_s/5         * a_factor * include_I
+
+                    # I2 nominal to w2w_ns, then between w2w_e and w1w_ns, i.e. w1w_ns - (w2w_s + w2w_e)
+                    GI2_nom  = G_layer(fit, dI2, layer='I', model=model)*(w1w_ns-(w2w_s+w2w_e))/5     * a_factor * include_I
+                    G_I2      = GI2_w2se + GI2_w1s + GI2_nom
+
+                if stack_I:
+                    # I1I2 tall on w2w_e, w1w_s, and w1w_e; nominal for rest of leg = lw - (w2w_tot + w2w_e + w1w_s + w1w_e)
+                    wI1I2_nom  = lw - (w2w_tot + w2w_e + w1w_s + w1w_e) + deltawI1I2_A
+                    GI1I2_nom  = G_layer(fit, dI1I2,            layer='I', model=model) * wI1I2_nom/5     * a_factor * include_I   # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
+                    GI1I2_w2e  = G_layer(fit, dI1I2+deltad_AW2, layer='I', model=model) * w2w_e/5         * a_factor * include_I   # taller I stack next to W2
+                    GI1I2_w1se = G_layer(fit, dI1I2+deltad_AW1, layer='I', model=model) * (w1w_s+w1w_e)/5 * a_factor * include_I
+                    G_I1I2     = GI1I2_nom + GI1I2_w2e + GI1I2_w1se
+                # else:
+                    #     # I1I2 tall on w1w_e, nominal for rest of leg
+                    # wI1I2_nom  = lw - (w2w_tot + w2w_e + w1w_s + w1w_e) + deltawI1I2_A
+                    # wI1I2_nom  = lw - (w1w_tot                 + w1w_e) + deltawI1I2_A
+
+                    #     GI1I2_w1e = G_layer(fit, dI1I2+deltad_AW1, layer='I', model=model) * w1w_e/5    * a_factor * include_I
+                    #     GI1I2_nom = G_layer(fit, dI1I2, layer='I', model=model) * (lw-(w1w_tot+w1w_e)+deltawI1I2_A)/5 * a_factor * include_I
+                    #     G_I1I2    = GI1I2_w1e + GI1I2_nom
 
             elif extend_I2:
                 # I2 is nom out to wI2_ext
                 G_I2 = G_layer(fit, dI2, layer='I', model=model) * wI2_ext/5 * a_factor * include_I
 
                 # I1I2 is tall on w2w_e, w1w_s, and w1w_e; nominal for rest of leg = lw - (w2w_tot + w2w_e + w1w_s + w1w_e)
-                wI1I2_nom  = lw - (w2w_tot + w2w_e + w1w_s + w1w_e)
+                wI1I2_nom  = lw - (w2w_tot + w2w_e + w1w_s + w1w_e) + deltawI1I2_A
                 GI1I2_nom  = G_layer(fit, dI1I2,            layer='I', model=model) * wI1I2_nom/5     * a_factor * include_I   # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
                 GI1I2_w2e  = G_layer(fit, dI1I2+deltad_AW2, layer='I', model=model) * w2w_e/5         * a_factor * include_I   # taller I stack next to W2
                 GI1I2_w1se = G_layer(fit, dI1I2+deltad_AW1, layer='I', model=model) * (w1w_s+w1w_e)/5 * a_factor * include_I
@@ -434,7 +490,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             else:
                 # I2 is nom out to w2w_tot, I1I2 is nom rest of leg
                 G_I2   = G_layer(fit, dI2,   layer='I', model=model) * w2w_tot/5      * a_factor * include_I
-                G_I1I2 = G_layer(fit, dI1I2, layer='I', model=model) * (lw-w2w_tot)/5 * a_factor * include_I   # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
+                G_I1I2 = G_layer(fit, dI1I2, layer='I', model=model) * (lw-w2w_tot+deltawI1I2_A)/5 * a_factor * include_I   # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
 
             # G_I     = G_I1 + GI2_ns + GI2_s + GI1I2_w2e + GI1I2_s + GI1I2_w1e + GI1I2_nom
             G_I = G_I1 + G_I2 + G_I1I2
@@ -577,7 +633,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
                 G_I2     = GI2_w2ns + GI2_w2s
 
                 # I1I2 tall on w2w_ea and w1w_s; nominal for rest of w1w
-                wI1I2_nom  = w1w_ns - (w2w_tot + w2w_e)
+                wI1I2_nom  = w1w_ns - (w2w_tot + w2w_e) + deltawI1I2_A
                 GI1I2_nom  = G_layer(fit, dI1I2,            layer='I', model=model) * wI1I2_nom/5 * a_factor * include_I   # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
                 GI1I2_w2e  = G_layer(fit, dI1I2+deltad_AW2, layer='I', model=model) * w2w_e/5     * a_factor * include_I   # taller I stack next to W2
                 GI1I2_w1s  = G_layer(fit, dI1I2+deltad_AW1, layer='I', model=model) * w1w_s/5     * a_factor * include_I
@@ -593,7 +649,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
                 G_I2 = G_layer(fit, dI2, layer='I', model=model) * wI2_ext/5 * a_factor * include_I
 
                 # I1I2 is tall on w2w_e; nominal for rest of w1w_tot
-                wI1I2_nom  = w1w_tot - w2w_tot - w2w_e
+                wI1I2_nom  = w1w_tot - w2w_tot - w2w_e + deltawI1I2_A
                 GI1I2_nom  = G_layer(fit, dI1I2,            layer='I', model=model) * wI1I2_nom/5  * a_factor * include_I   # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
                 GI1I2_w2e  = G_layer(fit, dI1I2+deltad_AW2, layer='I', model=model) * w2w_e/5      * a_factor * include_I   # taller I stack next to W2
                 G_I1I2     = GI1I2_nom + GI1I2_w2e
@@ -604,7 +660,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             else:
                 # I2 is nom out to w2w_tot, I1I2 is nom rest of leg
                 G_I2    = G_layer(fit, dI2,   layer='I', model=model)       * w2w_tot/5           * a_factor * include_I
-                G_I1I2  = G_layer(fit, dI1I2, layer='I', model=model)       * (w1w_tot-w2w_tot)/5 * a_factor * include_I   # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
+                G_I1I2  = G_layer(fit, dI1I2, layer='I', model=model)       * (w1w_tot-w2w_tot+deltawI1I2_A)/5 * a_factor * include_I   # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
                 G_SI1I2 = G_layer(fit, dSiNx+dI1I2, layer='I', model=model) * (lw-w1w_tot)/5      * a_factor * include_I   # rest of leg
 
             G_I = G_SiNx + G_I1 + G_I2 + G_I1I2 + G_SI1I2
@@ -746,17 +802,17 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
 
             if tall_Istacks:
                 # I2 tall on w2w_s, w2w_e, and w1w_s
-                G_I2_w2se = G_layer(fit, dI2+deltad_AW2, layer='I', model=model) * (w2w_s+w2w_e)/5 * a_factor * include_I   # add extra I2 on W2 slope and edge but keep I1 and I2 separate
-                G_I2_w1s  = G_layer(fit, dI2+deltad_AW1, layer='I', model=model) * w1w_s/5         * a_factor * include_I
+                GI2_w2se = G_layer(fit, dI2+deltad_AW2, layer='I', model=model) * (w2w_s+w2w_e)/5 * a_factor * include_I   # add extra I2 on W2 slope and edge but keep I1 and I2 separate
+                GI2_w1s  = G_layer(fit, dI2+deltad_AW1, layer='I', model=model) * w1w_s/5         * a_factor * include_I
 
                 # I2 nominal to w2w_ns, then between w2w_e and w1w_ns, i.e. w1w_ns - (w2w_s + w2w_e)
-                G_I2_nom  = G_layer(fit, dI2, layer='I', model=model)*(w1w_ns-(w2w_s+w2w_e))/5     * a_factor * include_I
-                G_I2      = G_I2_w2se + G_I2_w1s + G_I2_nom
+                GI2_nom  = G_layer(fit, dI2, layer='I', model=model)*(w1w_ns-(w2w_s+w2w_e))/5     * a_factor * include_I
+                G_I2      = GI2_w2se + GI2_w1s + GI2_nom
 
                 # I1I2 tall on w1w_e, nominal for rest of leg
                 GI1I2_w1e = G_layer(fit, dI1I2+deltad_AW1, layer='I', model=model) * w1w_e/5    * a_factor * include_I
                 # GI1I2_nom = G_layer(fit, dI1I2, layer='I', model=model) * w_istack/5 * a_factor * include_I
-                GI1I2_nom = G_layer(fit, dI1I2, layer='I', model=model) * (lw-(w1w_tot+w1w_e))/5 * a_factor * include_I
+                GI1I2_nom = G_layer(fit, dI1I2, layer='I', model=model) * (lw-(w1w_tot+w1w_e)+deltawI1I2_A)/5 * a_factor * include_I
                 G_I1I2    = GI1I2_w1e + GI1I2_nom
 
             elif extend_I2:
@@ -767,7 +823,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
                 G_I2        = GI2_nom_ext + GI2_nom_W1 + GI2_w2e
 
                 # I1I2 nominal for rest of leg = lw - w1w_tot
-                G_I1I2      = G_layer(fit, dI1I2, layer='I', model=model) * (lw-w1w_tot)/5 * a_factor * include_I
+                G_I1I2      = G_layer(fit, dI1I2, layer='I', model=model) * (lw-w1w_tot+deltawI1I2_A)/5 * a_factor * include_I
 
             else:   # I2 nominal out to w1w_tot, I1I2 nominal for rest of leg
                 G_I2  = G_layer(fit, dI2, layer='I', model=model)   * w1w_tot/5      * a_factor * include_I
@@ -940,7 +996,6 @@ def G_bolotest(fit, an_opts, bolo, layer='total'):
     G_legB = G_leg(fit, an_opts, bolo, dS_ABD, dW1_ABD, dI1_AB, dW2_B,  0.,    include_S, include_W, include_I, legB=True, supG_width=2.)   # S-W1-I1-W2, textured substrate for 2 um
     G_legC = G_leg(fit, an_opts, bolo, dS_CF,  0.,      dI1_C,  dW2_AC, dI2_C, include_S, include_W, include_I, legC=True, dI1I2=dI1I2_C)   # S-I1-W2-I2 (S-I1 stack)
     G_legD = G_leg(fit, an_opts, bolo, dS_ABD, dW1_ABD, dI_DF,  0.,     0.,    include_S, include_W, include_I, legD=True)   # S-W1-I1-I2 (I stack)
-    # G_legE = G_leg(fit, an_opts, bolo, dSE_W2, 0,       0.,     dW_E,   0.,    include_S, include_W, include_I, legE=True, supG_width=4., dSE_W1=dSE_W1, dSE_b=dSE_b)   # S-W1-W2 (W stack), textured substrate for 4 um
     G_legE = G_leg(fit, an_opts, bolo, dSE_W2, 0,       0.,     dW_E,   0.,    include_S, include_W, include_I, legE=True, supG_width=4.)   # S-W1-W2 (W stack), textured substrate for 4 um
     G_legF = G_leg(fit, an_opts, bolo, dS_CF,  0.,      dI_DF,  0.,     0.,    include_S, include_W, include_I, legF=True)   # S-I1-I2 (I stack)
     G_legG = G_leg(fit, an_opts, bolo, dS_G,   0.,      0.,     0.,     0.,    include_S, include_W, include_I, legG=True, supG_width=4.)   # bare S, textured substrate for 4 um
@@ -1861,6 +1916,8 @@ def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, fs=(9,6), dof=1):
         cbar.set_label('Leg Width [$\mu$m]')
 
     if save_figs: plt.savefig(plot_dir + 'Gpred_legacy' + fn_comments + plot_comments + '.png', dpi=300)
+
+    print('\nLegacy residuals within {} and {}\n'.format(round(min(normres),2), round(max(normres),2)))
 
     # save model predictions
     legacy['fit'] = {}
