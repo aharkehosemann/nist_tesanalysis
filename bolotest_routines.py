@@ -5,7 +5,7 @@ import matplotlib.gridspec as gridspec
 import pickle as pkl
 import csv
 import copy
-from scipy.optimize import minimize,  curve_fit, fsolve
+from scipy.optimize import minimize, curve_fit, fsolve
 from scipy.special import zeta
 from collections import OrderedDict
 from numpy.random import normal
@@ -253,21 +253,7 @@ def lw_regions(bolo, an_opts, delta_lw=0., delta_w2w=0.):
     w2w_tot   = w2w_ns  + w2w_s   # total width of W2
     w1w_tot   = w1w_ns  + w1w_s   # total width of W1
     wI2_ext   = w2w_tot + wI2_e   # total width of nominal I2 layer on legs A and C
-    # wI1I2_ext = w1w_tot + wI1I2_e   # total width of nominal I2 layer on legs A and C
 
-    # if stack_I:   # i stacks begin after W2
-    #     w1_istack = w1w_ns - (w2w_tot + w2w_e)
-    #     w_istack = w1_istack + w_istack_b   # total width of nominal I stacks
-    #     w_sstack = 0   # total width of nominal S-I1-I2 stacks
-    # elif stack_N:
-    #     w1_istack = w1w_ns - (w2w_tot + w2w_e)
-    #     w_istack = w1_istack  # total width of nominal I1-I2 stacks
-    #     w_sstack = w_istack_b   # total width of nominal S-I1-I2 stacks
-    # else:   # I stacks begin after W1
-    #     w_istack = w_istack_b   # total width of nominal I stacks
-    #     w_sstack = 0   # total width of nominal S-I1-I2 stacks
-
-    # return lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, w_istack, w_sstack, wI2_ext, wI1I2_ext
     return lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext
 
 def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, include_I, dI1I2=0., supG_width=0.,
@@ -960,16 +946,15 @@ def runsim_chisq(bolo, an_opts, plot_opts, save_sim=False):
         it_bolo['geometry']['layer_ds'] = sim_layerds[ii]
         it_bolo['data']['ydata']        = y_its[ii]
 
-        it_result = minimize(chisq_val, p0, args=[an_opts, it_bolo], bounds=bounds)   # minimize chi-squared function with this iteration's G_TES values and film thicknesses
-
-        return it_result['x']   # model fit parameters for iteration ii
+        return minimize(chisq_val, p0, args=[an_opts, it_bolo], bounds=bounds)['x']   # minimize chi-squared function with this iteration's G_TES values and film thicknesses
+        # return minimize(chisq_val, p0, args=[an_opts, it_bolo], bounds=bounds, method='L-BFGS-B')['x']   # minimize chi-squared function with this iteration's G_TES values and film thicknesses
 
     print('\nRunning MC Simulation on '+model+' Model\n')
     simstart = datetime.now()
     print('starting sim at {now}\n'.format(now=simstart.time()))
 
     # simulate y data and layer thicknesses (if vary_d=True)
-    y_its = np.random.normal(ydata, sigma, size=(num_its, len(ydata)))
+    y_its       = np.random.normal(ydata, sigma, size=(num_its, len(ydata)))
     sim_layerds = np.random.normal(layer_ds, derrs, size=(num_its, len(layer_ds))) if vary_d else np.tile(layer_ds, (num_its, 1))
 
     it_bolo   = copy.deepcopy(bolo)
