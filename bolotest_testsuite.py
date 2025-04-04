@@ -70,11 +70,11 @@ def test_alphascaleS(verbose=False):
             # print('all alpha    = 0: GS_0 = {}; GS_I = {}; GS_N = {}'.format(round(GSleg0_a0_1, 1), round(GSlegI_a0_1, 1), round(GSlegN_a0_1, 1)))
             print('\n'); print('G_bolotest() output, all alpha = 0:')
             print('GS0  / GSN   = {}'.format(GS0_a01_bt/GSN_a01_bt))
-            print('dsub / dSiOx = {}'.format(dsub1/dSiOx1)); print('\n')
+            print('dsub / dSiOx = {}\n'.format(dsub1/dSiOx1))
 
             print('G_leg() output,      all alpha = 0:')
             print('GS0  / GSN   = {}'.format(GS0_a01_leg/GSN_a01_leg))
-            print('dsub / dSiOx = {}'.format(dsub1/dSiOx1)); print('\n')
+            print('dsub / dSiOx = {}\n'.format(dsub1/dSiOx1))
 
         assert all([G >= 0 for G in np.array([GS0a0_bt, GS0a0_leg]).flat]), "G < 0"
         assert round(GS0_a01_bt/GSN_a01_bt, 3) == dsub1/dSiOx1, "GS0_bt/GSN_bt != dsub/dSiOx"
@@ -87,11 +87,11 @@ def test_alphascaleS(verbose=False):
             # print('all alpha    = 0: GS_0 = {}; GS_I = {}; GS_N = {}'.format(round(GSleg0_aI1_1, 1), round(GSlegI_aI1_1, 1), round(GSlegN_aI1_1, 1)))
             print('\n'); print('G_bolotest() output, aI = 1:')
             print('GS0  / GSN   = {}'.format(GS0_aI11_bt/GSN_aI11_bt))
-            print('dsub / dSiOx = {}'.format(dsub1/dSiOx1)); print('\n')
+            print('dsub / dSiOx = {}\n'.format(dsub1/dSiOx1))
 
             print('G_leg() output,      aI = 1:')
             print('GS0  / GSN   = {}'.format(GS0_aI11_leg/GSN_aI11_leg))
-            print('dsub / dSiOx = {}'.format(dsub1/dSiOx1)); print('\n')
+            print('dsub / dSiOx = {}\n'.format(dsub1/dSiOx1))
 
         assert all([G >= 0 for G in np.array([GS0aI1_bt, GS0aI1_leg]).flat]), "G < 0"
         assert round(GS0_aI11_bt/GSN_aI11_bt, 3)   == (dsub1/dSiOx1), "GS0_bt/GSN_bt   != (dsub1/dSiOx1)"
@@ -104,11 +104,11 @@ def test_alphascaleS(verbose=False):
             # print('all alpha    = 0: GS_0 = {}; GS_I = {}; GS_N = {}'.format(round(GSleg0_aS1_1, 1), round(GSlegI_aS1_1, 1), round(GSlegN_aS1_1, 1)))
             print('\n'); print('G_bolotest() output, aS = 1:')
             print('GS0  / GSN   = {}'.format(GS0_aS11_bt/GSN_aS11_bt))
-            print('dsub / dSiOx = {}'.format(dsub1/dSiOx1)); print('\n')
+            print('dsub / dSiOx = {}\n'.format(dsub1/dSiOx1))
 
             print('G_leg() output,      aS = 1:')
             print('GS0  / GSN   = {}'.format(GS0_aS11_leg/GSN_aS11_leg))
-            print('dsub / dSiOx = {}'.format(dsub1/dSiOx1)); print('\n')
+            print('dsub / dSiOx = {}\n'.format(dsub1/dSiOx1))
 
         assert all([G >= 0 for G in np.array([GS0aS1_bt, GS0aS1_leg]).flat]), "G < 0"
         assert round(GS0_aS11_bt/GSN_aS11_bt, 3)   == (dsub1/dSiOx1)**2, "GS0_bt/GSN_bt   != (dsub1/dSiOx1)^2"
@@ -144,11 +144,11 @@ def test_alphascaleI(verbose=False):
         GI0_w2_bt, GII_w2_bt, GIN_w2_bt = GI_w2_bt; GI0_w2_leg, GII_w2_leg, GIN_w2_leg = GI_w2_leg
         if verbose:
             print('\n'); print('G_bolotest() output, w < w2w:')
-            print('GIN  / GI0   = {}'.format(GIN_w2_bt/GI0_w2_bt)); print('\n')
+            print('GIN  / GI0   = {}\n'.format(GIN_w2_bt/GI0_w2_bt))
 
             print('G_leg() output,      w < w2w:')
-            print('GIN  / GI0   = {}'.format(GIN_w2_leg/GI0_w2_leg)); print('\n')
-            # print('(dI1 + dI2)^2 / (dI1 + dI2) = {}'.format(dIstack**2/dIstack)); print('\n')
+            print('GIN  / GI0   = {}\n'.format(GIN_w2_leg/GI0_w2_leg))
+            # print('(dI1 + dI2)^2 / (dI1 + dI2) = {}\n'.format(dIstack**2/dIstack))
         assert all([G >= 0 for G in np.array([GI_w2_bt, GI_w2_leg]).flat]), "G < 0"
         assert round(GIN_w2_bt/GI0_w2_bt, 3)   == 1, "GIN_bt/GI0_bt   = {} != 1 for w < w2w".format(round(GIN_w2_bt/GI0_w2_bt, 3))
         assert round(GIN_w2_bt/GII_w2_bt, 3)   == 1, "GIN_bt/GII_bt   = {} != 1 for w < w2w".format(round(GIN_w2_bt/GII_w2_bt, 3))
@@ -162,11 +162,11 @@ def test_alphascaleI(verbose=False):
         if verbose:
             print('\n'); print('G_bolotest() output, w2w < w < w1w:')
             print('GIN  / GI0                  = {}'.format(round(GIN_w1_bt/GI0_w1_bt, 3)))
-            print('(dI1 + dI2)^2 / (dI1 + dI2) = {}'.format(round(dIstack**2/dIstack, 3))); print('\n')
+            print('(dI1 + dI2)^2 / (dI1 + dI2) = {}\n'.format(round(dIstack**2/dIstack, 3)))
 
             print('G_leg() output,      w2w < w < w1w:')
             print('GIN  / GI0                  = {}'.format(round(GIN_w1_leg/GI0_w1_leg, 3)))
-            print('(dI1 + dI2)^2 / (dI1 + dI2) = {}'.format(round(dIstack**2/dIstack, 3))); print('\n')
+            print('(dI1 + dI2)^2 / (dI1 + dI2) = {}\n'.format(round(dIstack**2/dIstack, 3)))
         assert all([G >= 0 for G in np.array([GI_w1_bt, GI_w1_leg]).flat]), "G < 0"
         assert round(GIN_w1_bt/GI0_w1_bt, 3)   == dIstack, "GIN_bt/GI0_bt   != (dI1 + dI2)^2 / (dI1 + dI2) for w2w < w < w1w"
         assert round(GIN_w1_bt/GII_w1_bt, 3)   == 1,       "GIN_bt/GII_bt   != 1f or w2w < w < w1w for w2w < w < w1w"
@@ -210,7 +210,7 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         GW0  = G_leg(fit, anopts0, bolo0, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=True)
         GI0  = G_leg(fit, anopts0, bolo0, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=True)
         G0   = G_leg(fit, anopts0, bolo0, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=True)
-        if verbose: print('G_S no stack estimate difference: {} %'.format(round((GS0-GS00)/GS00*100, 1))); print('\n')
+        if verbose: print('G_S no stack estimate difference: {} %\n'.format(round((GS0-GS00)/GS00*100, 1)))
 
         assert all([G >= 0 for G in np.array([GS00, GS0, GW0, GI0, G0]).flat]), "G < 0"
         assert (round(GS0/GS00, 3) == 1 or GS00==0), "GS0_leg/GS0_calc != 1"
@@ -220,7 +220,7 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         GWI  = G_leg(fit, anoptsI, boloI, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=True)
         GII  = G_leg(fit, anoptsI, boloI, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=True)
         GI   = G_leg(fit, anoptsI, boloI, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=True)
-        if verbose: print('G_S I-layer stack estimate difference: {} %'.format(round((GSI-GSI0)/GSI0*100, 1))); print('\n')
+        if verbose: print('G_S I-layer stack estimate difference: {} %\n'.format(round((GSI-GSI0)/GSI0*100, 1)))
         assert (round(GSI/GSI0, 3) == 1 or GSI0==0), "GSI_leg/GSI_calc != 1"
 
         GSN0 = fit[0] * (dSiOx/0.400)**(fit[3]+1) * lw/5
@@ -257,11 +257,11 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
             print('G_I    nitride stack estimate difference = {} %'.format(round(GIN-GIN0)/GIN0*100, 1))
             print('G_SiNx nitride stack estimate difference = {} %'.format(round(GSiNx-GSiNx0)/GSiNx0*100, 1))
             print('G_SiNx nitride is   = {} % of GI'.format(round(GSiNx/GIN*100, 1)))
-            print('SiNx   nitride d is = {} % of total nitride d'.format(round(dSiNx/(dSiNx+dI1+dI2)*100, 1))); print('\n')
+            print('SiNx   nitride d is = {} % of total nitride d\n'.format(round(dSiNx/(dSiNx+dI1+dI2)*100, 1)))
 
             print('G_S    nitride stack bolotest output difference = {} %'.format(round(GSN_bt-GSN0)/GSN0*100, 1))
             print('G_SiNx nitride stack bolotest output difference = {} %'.format(round(GSiNx_bt-GSiNx0)/GSiNx0*100, 1))
-            print('G_I    nitride stack bolotest output difference = {} %'.format(round(GIN_bt-GIN0)/GIN0*100, 1)); print('\n')
+            print('G_I    nitride stack bolotest output difference = {} %\n'.format(round(GIN_bt-GIN0)/GIN0*100, 1))
 
             print('G(I Stacks) > G(No Stacks) = {}'.format(GI > G0))
             print('G(N Stacks) > G(No Stacks) = {}'.format(GN > G0))
@@ -369,27 +369,27 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         # plt.grid(linestyle = '--', which='both', linewidth=0.5)   # grid lines on plot
         # plt.legend()
 
-        plt.figure(figsize=(10,5.5))
-        plt.plot(lwrange/2, G0I_lw,       alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
-        plt.plot(lwrange/2, GII_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
-        plt.plot(lwrange/2, GNI_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
-        # plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
-        plt.vlines([w2w/2, w1w/2, (lw+delta_lw)/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.7, color='k')
-        if tall_Istacks:
-            plt.vlines([np.array([w2w-w_stacks[0], w2w+w_stacks[1]])/2, np.array([w1w-w_stacks[2], w1w+w_stacks[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
-        elif extend_I2:
-            plt.vlines(np.array([w2w+w_stacks[4], w2w+w_stacks[1]])/2, 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
-        # plt.annotate('W2', (w2w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
-        # plt.annotate('W1', (w1w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
-        plt.annotate('W2', ((w2w-0.2)/2, np.max(GNI_lw)*0.05), bbox=dict(boxstyle='square,pad=0.3', fc='w', ec='k', lw=1))
-        plt.annotate('W1', ((w1w-0.2)/2, np.max(GNI_lw)*0.05), bbox=dict(boxstyle='square,pad=0.3', fc='w', ec='k', lw=1))
-        plt.annotate('leg', ((lw+delta_lw-0.15)/2,  np.max(GNI_lw)*0.15), bbox=dict(boxstyle='square,pad=0.3', fc='w', ec='k', lw=1))
-        plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_I$ [pW/K]')
-        plt.ylim(min(GNI_lw)*0., np.nanmax([G0I_lw, GII_lw, GNI_lw])*1.1)
-        # plt.ylim(min(GNI_lw)*0., 14)
-        plt.xlim(min(lwrange)/2, max(lwrange)/2)
-        plt.grid(linestyle = '--', which='both', linewidth=0.5)   # grid lines on plot
-        plt.legend()
+        # plt.figure(figsize=(10,5.5))
+        # plt.plot(lwrange/2, G0I_lw,       alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
+        # plt.plot(lwrange/2, GII_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
+        # plt.plot(lwrange/2, GNI_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
+        # # plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
+        # plt.vlines([w2w/2, w1w/2, (lw+delta_lw)/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.7, color='k')
+        # if tall_Istacks:
+        #     plt.vlines([np.array([w2w-w_stacks[0], w2w+w_stacks[1]])/2, np.array([w1w-w_stacks[2], w1w+w_stacks[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
+        # elif extend_I2:
+        #     plt.vlines(np.array([w2w+w_stacks[4], w2w+w_stacks[1]])/2, 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
+        # # plt.annotate('W2', (w2w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
+        # # plt.annotate('W1', (w1w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
+        # plt.annotate('W2', ((w2w-0.2)/2, np.max(GNI_lw)*0.05), bbox=dict(boxstyle='square,pad=0.3', fc='w', ec='k', lw=1))
+        # plt.annotate('W1', ((w1w-0.2)/2, np.max(GNI_lw)*0.05), bbox=dict(boxstyle='square,pad=0.3', fc='w', ec='k', lw=1))
+        # plt.annotate('leg', ((lw+delta_lw-0.15)/2,  np.max(GNI_lw)*0.15), bbox=dict(boxstyle='square,pad=0.3', fc='w', ec='k', lw=1))
+        # plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_I$ [pW/K]')
+        # plt.ylim(min(GNI_lw)*0., np.nanmax([G0I_lw, GII_lw, GNI_lw])*1.1)
+        # # plt.ylim(min(GNI_lw)*0., 14)
+        # plt.xlim(min(lwrange)/2, max(lwrange)/2)
+        # plt.grid(linestyle = '--', which='both', linewidth=0.5)   # grid lines on plot
+        # plt.legend()
 
         # plt.figure(figsize=(10,5.5))
         # plt.plot(lwrange/2, G0S_lw + G0I_lw,       alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
@@ -448,9 +448,9 @@ def test_widths(dsub=0.380, dSiOx=0.120, lw=7, w1w=6, w2w=4, dI1=0.5, dI2=0.6, s
     bolo1, anopts1 = test_objs(tall_Istacks=True, stack_I=stack_I, stack_N=stack_N, lw=lw, dsub=dsub, w1w=w1w, w2w=w2w, dI1=dI1, dI2=dI2, w_stacks=w_stacks1, d_stacks=d_stacks)   # yes I layer thickness adjustments at W layer edges
     bolo2, anopts2 = test_objs(extend_I2   =True, stack_I=stack_I, stack_N=stack_N, lw=lw, dsub=dsub, w1w=w1w, w2w=w2w, dI1=dI1, dI2=dI2, w_stacks=w_stacks1, d_stacks=d_stacks)   # yes I layer thickness adjustments at W layer edges
 
-    region_ws0 = lw_regions(bolo0, anopts0); lw0, w2w_ns0, w1w_ns0, w2w_s0, w1w_s0, w2w_e0, w1w_e0, w2w_tot0, w1w_tot0, w_istack0, w_sstack0, wI2_ext0, wI1I2_ext0 = region_ws0
-    region_ws1 = lw_regions(bolo1, anopts1); lw1, w2w_ns1, w1w_ns1, w2w_s1, w1w_s1, w2w_e1, w1w_e1, w2w_tot1, w1w_tot1, w_istack1, w_sstack1, wI2_ext1, wI1I2_ext1 = region_ws1
-    region_ws2 = lw_regions(bolo2, anopts2); lw2, w2w_ns2, w1w_ns2, w2w_s2, w1w_s2, w2w_e2, w1w_e2, w2w_tot2, w1w_tot2, w_istack2, w_sstack2, wI2_ext2, wI1I2_ext2 = region_ws1
+    region_ws0 = lw_regions(bolo0, anopts0); lw0, w2w_ns0, w1w_ns0, w2w_s0, w1w_s0, w2w_e0, w1w_e0, w2w_tot0, w1w_tot0, wI2_ext0 = region_ws0
+    region_ws1 = lw_regions(bolo1, anopts1); lw1, w2w_ns1, w1w_ns1, w2w_s1, w1w_s1, w2w_e1, w1w_e1, w2w_tot1, w1w_tot1, wI2_ext1 = region_ws1
+    region_ws2 = lw_regions(bolo2, anopts2); lw2, w2w_ns2, w1w_ns2, w2w_s2, w1w_s2, w2w_e2, w1w_e2, w2w_tot2, w1w_tot2, wI2_ext2 = region_ws1
 
     assert lw0==lw, "lw != input lw"
     assert lw1==lw, "lw != input lw"
