@@ -256,7 +256,7 @@ def lw_regions(bolo, an_opts, delta_lw=0., delta_w2w=0.):
 
     return lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext
 
-def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, include_I, dI1I2=0., supG_width=0.,
+def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, include_I, dI1I20=0., supG_width=0.,
           legA=False, legB=False, legC=False, legD=False, legE=False, legF=False, legG=False):
 
     beta         = 1.   # power law exponent for width scaling
@@ -282,7 +282,13 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
         a_factor = (220/ll)**pLscale
 
     ### leg-specific geometry adjustments
-    dI1I2     = (dI1 + dI2 + deltadI1I2_A) if legA else (dI1 + dI2)
+    if legA:
+        dI1I2 = (dI1 + dI2 + deltadI1I2_A)
+    elif legC:
+        dI1I2 = dI1I20
+    else:
+        dI1I2 = dI1 + dI2
+
     delta_w2w = (bolo['geometry']['w1w'] - bolo['geometry']['w2w']) if legC else 0
 
     if (legA or legD):
@@ -891,7 +897,7 @@ def G_bolotest(fit, an_opts, bolo, layer='total'):
     #        G_leg(fit, an_opts, bolo, dS,     dW1,     dI1,    dW2,    dI2,   include_S, include_W, include_I)
     G_legA = G_leg(fit, an_opts, bolo, dS_ABD, dW1_ABD, dI1_AB, dW2_AC, dI2_A, include_S, include_W, include_I, legA=True)   # S-W1-I1-W2-I2
     G_legB = G_leg(fit, an_opts, bolo, dS_ABD, dW1_ABD, dI1_AB, dW2_B,  0.,    include_S, include_W, include_I, legB=True, supG_width=2.)   # S-W1-I1-W2, textured substrate for 2 um
-    G_legC = G_leg(fit, an_opts, bolo, dS_CF,  0.,      dI1_C,  dW2_AC, dI2_C, include_S, include_W, include_I, legC=True, dI1I2=dI1I2_C)   # S-I1-W2-I2 (S-I1 stack)
+    G_legC = G_leg(fit, an_opts, bolo, dS_CF,  0.,      dI1_C,  dW2_AC, dI2_C, include_S, include_W, include_I, legC=True, dI1I20=dI1I2_C)   # S-I1-W2-I2 (S-I1 stack)
     G_legD = G_leg(fit, an_opts, bolo, dS_ABD, dW1_ABD, dI_DF,  0.,     0.,    include_S, include_W, include_I, legD=True)   # S-W1-I1-I2 (I stack)
     G_legE = G_leg(fit, an_opts, bolo, dSE_W2, 0,       0.,     dW_E,   0.,    include_S, include_W, include_I, legE=True, supG_width=4.)   # S-W1-W2 (W stack), textured substrate for 4 um
     G_legF = G_leg(fit, an_opts, bolo, dS_CF,  0.,      dI_DF,  0.,     0.,    include_S, include_W, include_I, legF=True)   # S-I1-I2 (I stack)
@@ -965,11 +971,11 @@ def runsim_chisq(bolo, an_opts, plot_opts, save_sim=False):
     print('sim finished | time elapsed: {stime}\n'.format(stime=simend-simstart))
 
     # Predictions for bolotest G(d0) and G of the microstrip (W1-I1-W2-I2)
-    Gpreds =   G_bolotest(pfits_sim, an_opts, bolo)   # simulation G predictions using d0
+    Gpreds   = G_bolotest(pfits_sim, an_opts, bolo)   # simulation G predictions using d0
     Gpred_Ss = G_bolotest(pfits_sim, an_opts, bolo, layer='S')   # substrate contribution
     Gpred_Ws = G_bolotest(pfits_sim, an_opts, bolo, layer='W')   # W layer contributions
     Gpred_Is = G_bolotest(pfits_sim, an_opts, bolo, layer='I')   # I layer contributions
-    Gwires =   G_bolotest(pfits_sim, an_opts, bolo, layer='wiring').T[0]/4   # function outputs G_microstrip for four legs
+    Gwires   =   G_bolotest(pfits_sim, an_opts, bolo, layer='wiring').T[0]/4   # function outputs G_microstrip for four legs
 
     sim_dict = {}
     sim_dict['sim'] = {}   # save simulation arrays
