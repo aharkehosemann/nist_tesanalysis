@@ -230,8 +230,6 @@ def lw_regions(bolo, an_opts, delta_lw=0., delta_w2w=0.):
         w1w_e   = w1w_edge if lw>(w1w+w1w_edge) else np.nanmax([lw-w1w, 0])   # width of taller I layer(s) at edge of W2
         wI1I2_e = wI2_edge if lw>(w1w+wI2_edge) else np.nanmax([lw-w1w, 0])   # extended width of nominal I2 layer on legs A and C
 
-        # # nominal i stacks beyond tall ones after W2
-        # w_istack_b  = (lw-w1w-w1w_edge) if lw>(w1w+w1w_edge) else 0
 
     else:
         lw = lw0 + delta_lw; lw[lw<0] = 0
@@ -256,6 +254,47 @@ def lw_regions(bolo, an_opts, delta_lw=0., delta_w2w=0.):
 
     return lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext
 
+def mfpb(w_phys, d_2walls, d_1wall=0.):   # calculate effective thickness for width-restricted I layers
+    d_tot = d_2walls + d_1wall
+    w_loc = (w_phys*d_2walls + 2*w_phys*d_1wall)/d_tot   # thickness-weighted local width
+    return (1/d_tot + 1/w_loc)**(-1)
+
+def deff(fit, dI, mfp_b, wI):   # calculate effective thickness for width-restricted I layers
+
+    numrows = fit.shape[0]   # num of rows determines type of fit passed
+    if numrows==1 or len(fit.shape)==1:   # user passed one set of fit parameters with no error bars
+        alphaI = fit[5]
+    elif numrows==2:   # user passed fit parameters and errors
+        alphaI = fit[0][5]
+    elif numrows>2:   # user passed many sets of fit parameters, likely the results of a simulation
+        alphaI = fit[:, 5]
+    # alphaI = fit[5]
+
+    d_effs = ( dI * mfp_b**alphaI )**(1/(1+alphaI))
+    d_eff = np.sum( d_effs * wI ) / np.sum(wI)   # width-weighted average d_effective - if sum(wI) = total w for layer, then final GI is sum of individual region d's * region w's
+
+    return d_eff
+
+def deff_andmfpb(fit, wI, d_2walls, d_1wall=0.):   # calculate effective thickness for width-restricted I layers
+    # d_2walls = thickness of layer section with two sidewalls
+
+    numrows = fit.shape[0]   # num of rows determines type of fit passed
+    if numrows==1 or len(fit.shape)==1:   # user passed one set of fit parameters with no error bars
+        alphaI = fit[5]
+    elif numrows==2:   # user passed fit parameters and errors
+        alphaI = fit[0][5]
+    elif numrows>2:   # user passed many sets of fit parameters, likely the results of a simulation
+        alphaI = fit[:, 5]
+
+    mfp_b = mfpb(wI, d_2walls, d_1wall)   # calculate boundary-scattering mfp
+
+    dI     = d_2walls + d_1wall  # total thickness
+
+    d_effs = ( dI * mfp_b**alphaI )**(1/(1+alphaI))
+    d_eff  = np.sum( d_effs * wI ) / np.sum(wI)   # width-weighted average d_effective - if sum(wI) = total w for layer, then final GI is sum of individual region d's * region w's
+
+    return d_eff#, mfp_b
+
 def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, include_I, dI1I20=0., supG_width=0.,
           legA=False, legB=False, legC=False, legD=False, legE=False, legF=False, legG=False):
 
@@ -266,6 +305,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
     supG         = an_opts.get('supG', 0.0)
     tall_Istacks = an_opts.get('tall_Istacks')
     extend_I2    = an_opts.get('extend_I2', False)
+    calc_dIeff   = an_opts.get('calc_dIeff', False)
 
     # leg-specific geometry adjustments
     deltalw_AD   = bolo['geometry'].get('deltalw_AD',   0.0)   # width difference for legs A and D
@@ -273,7 +313,6 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
     deltawI1I2_A = bolo['geometry'].get('deltawI1I2_A', 0.0)   # width difference for legs A and D
     deltadI1I2_A = bolo['geometry'].get('deltadI1I2_A', 0.0)   # width difference for legs A and D
 
-    # bolo_calcG   = copy.deepcopy(bolo)   # copy bolo dictionary to avoid overwriting
     # scale with L and d in diffuse / ballistic transition
     if bolo['geometry'].get('acoustic_Lscale'):   # use acoustic scaling
         a_factor = acoust_factor(bolo)
@@ -574,20 +613,109 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
                     wSI1I2_nom    = 0.
                     wSI1I2_tallw1 = 0.
 
-            G_SiNx = G_layer(fit, dSiNx, layer='I', model=model) * wSiNx_nom/5 * a_factor * include_I   # dSiNx = 0 if not stack_N
-            G_I1   = G_layer(fit, dI1, layer='I', model=model)   * wI1_nom/5   * a_factor * include_I
+            G_SiNx     = G_layer(fit, dSiNx, layer='I', model=model) * wSiNx_nom/5 * a_factor * include_I   # dSiNx = 0 if not stack_N
 
-            GI2_nom    = G_layer(fit, dI2,            layer='I', model=model) * wI2_nom/5 * a_factor * include_I
-            GI2_tallw2 = G_layer(fit, dI2+deltadI_W2, layer='I', model=model) * wI2_tallw2/5                     * a_factor * include_I
-            GI2_tallw1 = G_layer(fit, dI2+deltadI_W1, layer='I', model=model) * wI2_tallw1/5                     * a_factor * include_I
+            if calc_dIeff:
 
-            GI1I2_nom    = G_layer(fit, dI1I2,            layer='I', model=model) * wI1I2_nom/5    * a_factor * include_I   # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
-            GI1I2_tallw2 = G_layer(fit, dI1I2+deltadI_W2, layer='I', model=model) * wI1I2_tallw2/5 * a_factor * include_I   # taller I stack next to W2
-            GI1I2_tallw1 = G_layer(fit, dI1I2+deltadI_W1, layer='I', model=model) * wI1I2_tallw1/5 * a_factor * include_I
+                if len(fit.shape) > 1:   # received multiple fits
+                    dI10 = dI1; dI20 = dI2
+                    # dI1, mfpb_I1 = deff_andmfpb(fit, wI1_nom, dI10)
+                    # dI2, mfpb_I2 = deff_andmfpb(fit, wI2_nom, dI20)
+                    dI1_eff = np.array([deff_andmfpb(fit[ff], wI1_nom, dI10) for ff in np.arange(len(fit))])
+                    dI2_eff = np.array([deff_andmfpb(fit[ff], wI2_nom, dI20) for ff in np.arange(len(fit))])
+                    assert np.all(dI1_eff <= dI10) and np.all(dI2_eff <= dI20), 'dI1_eff and/or dI2_eff is > dI0'
 
-            GSI1I2_nom    = G_layer(fit, dSiNx+dI1I2, layer='I', model=model)            * wSI1I2_nom/5    * a_factor * include_I   # rest of leg
-            GSI1I2_tallw2 = 0
-            GSI1I2_tallw1 = G_layer(fit, dSiNx+dI1I2+deltadI_W1, layer='I', model=model) * wSI1I2_tallw1/5 * a_factor * include_I
+                    dI1I20        = dI1I2
+                    wI1I2_3and4   = (w1w_ns - (w2w_tot + w2w_e) + deltawI1I2_A)/2
+                    wI1I2_5       = wI1I2_nom - wI1I2_3and4*2
+                    wI1I2_regions = np.array([wI1I2_3and4, wI1I2_3and4, wI1I2_5])
+
+                    dI1I2_2walls  = np.array([dI1I20-dI1,  dI1I20-dI1,  dW1])
+                    dI1I2_1wall   = np.array([dI1,         dI1,         dI1I20-dW1])
+
+                    dI1I2_eff = np.array([deff_andmfpb(fit[ff], wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall) for ff in np.arange(len(fit))])
+                    assert np.all(dI1I2_eff <= dI1I20), 'dI1I2_eff is > dI1I20'
+
+                    G_I1         = np.array([G_layer(fit[ff], dI1_eff[ff],              layer='I', model=model) for ff in np.arange(len(fit))]) * wI1_nom/5   * a_factor * include_I
+                    # G_I1         = np.array([G_layer(fit[ff], dI1_eff,              layer='I', model=model) for ff in np.arange(len(fit))]) * wI1_nom/5   * a_factor * include_I
+
+                    GI2_nom      = np.array([G_layer(fit[ff], dI2_eff[ff],              layer='I', model=model) for ff in np.arange(len(fit))]) * wI2_nom/5 * a_factor * include_I
+                    GI2_tallw2   = np.array([G_layer(fit[ff], dI2_eff[ff]+deltadI_W2,   layer='I', model=model) for ff in np.arange(len(fit))]) * wI2_tallw2/5                     * a_factor * include_I
+                    GI2_tallw1   = np.array([G_layer(fit[ff], dI2_eff[ff]+deltadI_W1,   layer='I', model=model) for ff in np.arange(len(fit))]) * wI2_tallw1/5                     * a_factor * include_I
+                    # GI2_nom      = np.array([G_layer(fit[ff], dI2_eff,              layer='I', model=model) for ff in np.arange(len(fit))]) * wI2_nom/5 * a_factor * include_I
+                    # GI2_tallw2   = np.array([G_layer(fit[ff], dI2_eff+deltadI_W2,   layer='I', model=model) for ff in np.arange(len(fit))]) * wI2_tallw2/5                     * a_factor * include_I
+                    # GI2_tallw1   = np.array([G_layer(fit[ff], dI2_eff+deltadI_W1,   layer='I', model=model) for ff in np.arange(len(fit))]) * wI2_tallw1/5                     * a_factor * include_I
+
+                    # diff dI1I2 for each alphaI value
+                    GI1I2_nom    = np.array([G_layer(fit[ff], dI1I2_eff[ff],            layer='I', model=model) for ff in np.arange(len(fit))]) * wI1I2_nom/5    * a_factor * include_I   # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
+                    GI1I2_tallw2 = np.array([G_layer(fit[ff], dI1I2_eff[ff]+deltadI_W2, layer='I', model=model) for ff in np.arange(len(fit))]) * wI1I2_tallw2/5 * a_factor * include_I   # taller I stack next to W2
+                    GI1I2_tallw1 = np.array([G_layer(fit[ff], dI1I2_eff[ff]+deltadI_W1, layer='I', model=model) for ff in np.arange(len(fit))]) * wI1I2_tallw1/5 * a_factor * include_I
+
+                    GSI1I2_nom    = np.array([G_layer(fit[ff], dSiNx+dI1I2_eff[ff],     layer='I', model=model) for ff in np.arange(len(fit))])            * wSI1I2_nom/5    * a_factor * include_I   # rest of leg
+                    GSI1I2_tallw2 = 0
+                    GSI1I2_tallw1 = np.array([G_layer(fit[ff], dSiNx+dI1I2_eff[ff]+deltadI_W1, layer='I', model=model) for ff in np.arange(len(fit))]) * wSI1I2_tallw1/5 * a_factor * include_I
+
+                else:
+                    dI10 = dI1; dI20 = dI2
+                    # dI1, mfpb_I1 = deff_andmfpb(fit, wI1_nom, dI10)
+                    # dI2, mfpb_I2 = deff_andmfpb(fit, wI2_nom, dI20)
+                    dI1_eff = deff_andmfpb(fit, wI1_nom, dI10)
+                    dI2_eff = deff_andmfpb(fit, wI2_nom, dI20)
+                    assert dI1_eff <= dI10 and dI2_eff <= dI20, 'dI1_eff or dI2_eff is > dI0'
+
+                    dI1I20        = dI1I2
+                    wI1I2_3and4   = (w1w_ns - (w2w_tot + w2w_e) + deltawI1I2_A)/2
+                    wI1I2_5       = wI1I2_nom - wI1I2_3and4*2
+                    wI1I2_regions = np.array([wI1I2_3and4, wI1I2_3and4, wI1I2_5])
+
+                    dI1I2_2walls  = np.array([dI1I20-dI1,  dI1I20-dI1,  dW1])
+                    dI1I2_1wall   = np.array([dI1,         dI1,         dI1I20-dW1])
+
+                    dI1I2_eff = deff_andmfpb(fit, wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall)
+                    assert dI1I2_eff <= dI1I20, 'dI1I2_eff is > dI1I20'
+
+                    G_I1       = G_layer(fit, dI1_eff, layer='I', model=model)   * wI1_nom/5   * a_factor * include_I
+
+                    GI2_nom    = G_layer(fit, dI2_eff,            layer='I', model=model) * wI2_nom/5 * a_factor * include_I
+                    GI2_tallw2 = G_layer(fit, dI2_eff+deltadI_W2, layer='I', model=model) * wI2_tallw2/5                     * a_factor * include_I
+                    GI2_tallw1 = G_layer(fit, dI2_eff+deltadI_W1, layer='I', model=model) * wI2_tallw1/5                     * a_factor * include_I
+
+                    GI1I2_nom    = G_layer(fit, dI1I2_eff, layer='I', model=model) * wI1I2_nom/5 * a_factor * include_I   # taller I stack next to W2
+                    GI1I2_tallw2 = G_layer(fit, dI1I2_eff+deltadI_W2, layer='I', model=model) * wI1I2_tallw2/5 * a_factor * include_I   # taller I stack next to W2
+                    GI1I2_tallw1 = G_layer(fit, dI1I2_eff+deltadI_W1, layer='I', model=model) * wI1I2_tallw1/5 * a_factor * include_I
+
+                    GSI1I2_nom    = G_layer(fit, dSiNx+dI1I2_eff, layer='I', model=model)            * wSI1I2_nom/5    * a_factor * include_I   # rest of leg
+                    GSI1I2_tallw2 = 0
+                    GSI1I2_tallw1 = G_layer(fit, dSiNx+dI1I2_eff+deltadI_W1, layer='I', model=model) * wSI1I2_tallw1/5 * a_factor * include_I
+
+                # if len(fit.shape) > 1:
+                    # dI10 = dI1; dI20 = dI2
+                    # dI1, mfpb_I1 = deff_andmfpb(fit, wI1_nom, dI10)
+                    # dI2, mfpb_I2 = deff_andmfpb(fit, wI2_nom, dI20)
+
+                    # dI1I20        = dI1I2
+                    # wI1I2_3and4   = (w1w_ns - (w2w_tot + w2w_e) + deltawI1I2_A)/2
+                    # wI1I2_5       = wI1I2_nom - wI1I2_3and4*2
+                    # wI1I2_regions = np.array([wI1I2_3and4, wI1I2_3and4, wI1I2_5])
+
+                    # dI1I2_2walls  = np.array([dI1I20-dI1,  dI1I20-dI1,  dW1])
+                    # dI1I2_1wall   = np.array([dI1,         dI1,         dI1I20-dW1])
+                    # dI1I2, mfpb_I1I2 = deff_andmfpb(fit, wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall)
+
+            else:
+                G_I1       = G_layer(fit, dI1, layer='I', model=model)   * wI1_nom/5   * a_factor * include_I
+
+                GI2_nom    = G_layer(fit, dI2,            layer='I', model=model) * wI2_nom/5 * a_factor * include_I
+                GI2_tallw2 = G_layer(fit, dI2+deltadI_W2, layer='I', model=model) * wI2_tallw2/5                     * a_factor * include_I
+                GI2_tallw1 = G_layer(fit, dI2+deltadI_W1, layer='I', model=model) * wI2_tallw1/5                     * a_factor * include_I
+
+                GI1I2_nom    = G_layer(fit, dI1I2, layer='I', model=model) * wI1I2_nom/5 * a_factor * include_I   # taller I stack next to W2
+                GI1I2_tallw2 = G_layer(fit, dI1I2+deltadI_W2, layer='I', model=model) * wI1I2_tallw2/5 * a_factor * include_I   # taller I stack next to W2
+                GI1I2_tallw1 = G_layer(fit, dI1I2+deltadI_W1, layer='I', model=model) * wI1I2_tallw1/5 * a_factor * include_I
+
+                GSI1I2_nom    = G_layer(fit, dSiNx+dI1I2, layer='I', model=model)            * wSI1I2_nom/5    * a_factor * include_I   # rest of leg
+                GSI1I2_tallw2 = 0
+                GSI1I2_tallw1 = G_layer(fit, dSiNx+dI1I2+deltadI_W1, layer='I', model=model) * wSI1I2_tallw1/5 * a_factor * include_I
 
         elif legB:   # S-W1-I1-W2
 
@@ -601,7 +729,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             wI1_nom   = w2w_tot   # I1 is trimmed to W2 width, no I2
 
             G_SiNx = G_layer(fit, dSiNx, layer='I', model=model) * wSiNx_nom/5 * a_factor * include_I
-            G_I1   = G_layer(fit, dI1, layer='I', model=model)   * wI1_nom/5   * a_factor * include_I
+            G_I1   = G_layer(fit, dI1,   layer='I', model=model)   * wI1_nom/5   * a_factor * include_I
 
             # no I2 and I1 ends at W2, so no I stacks
             GI2_nom = 0;    GI2_tallw2 = 0;    GI2_tallw1 = 0
@@ -967,7 +1095,7 @@ def runsim_chisq(bolo, an_opts, plot_opts, save_sim=False):
     pfits_sim = Parallel(n_jobs=-1, verbose=5)(delayed(iteration)(ii) for ii in range(num_its))
     pfits_sim = np.array(pfits_sim)
 
-    simend      = datetime.now()
+    simend    = datetime.now()
     print('sim finished | time elapsed: {stime}\n'.format(stime=simend-simstart))
 
     # Predictions for bolotest G(d0) and G of the microstrip (W1-I1-W2-I2)
@@ -975,7 +1103,7 @@ def runsim_chisq(bolo, an_opts, plot_opts, save_sim=False):
     Gpred_Ss = G_bolotest(pfits_sim, an_opts, bolo, layer='S')   # substrate contribution
     Gpred_Ws = G_bolotest(pfits_sim, an_opts, bolo, layer='W')   # W layer contributions
     Gpred_Is = G_bolotest(pfits_sim, an_opts, bolo, layer='I')   # I layer contributions
-    Gwires   =   G_bolotest(pfits_sim, an_opts, bolo, layer='wiring').T[0]/4   # function outputs G_microstrip for four legs
+    Gwires   = G_bolotest(pfits_sim, an_opts, bolo, layer='wiring').T[0]/4   # function outputs G_microstrip for four legs
 
     sim_dict = {}
     sim_dict['sim'] = {}   # save simulation arrays
@@ -1306,24 +1434,11 @@ def pairwise(sim_dict, plot_opts, indstp=[], indsop=[], oplotlabel='', fs=(10,8)
 def bolotest_area(bolo, an_opts):
     # approximate bolotest leg xsect area for plotting
 
-    # layer_ds = an_opts.get('layer_ds', np.array([0.372, 0.312, 0.199, 0.181, 0.162, 0.418, 0.298, 0.596, 0.354, 0.314, 0.302]))
-    # dS_ABD, dS_CF, dSE_W2, dS_G, dW1_ABD, dW_E, dI1_AB, dI_DF, dW2_AC, dW2_B, dI2_A = layer_ds
     layer_ds = bolo['geometry'].get('layer_ds', np.array([0.372, 0.312, 0.199, 0., 0., 0.181, 0.162, 0.418, 0.298, 0., 0.596, 0.354, 0.314, 0.302, 0., 0.]))
     dS_ABD, dS_CF, dSE_W2, dSE_W1, dSE_b, dS_G, dW1_ABD, dW_E, dI1_AB, dI1_C, dI_DF, dW2_AC, dW2_B, dI2_A, dI2_C, dI1I2_C = layer_ds.T
 
-    # lw = bolo['geometry']['lw']   # um, bolotest leg length
-    # w1w = bolo['geometry']['w1w']; w2w = bolo['geometry']['w2w']   # [um] W layer widths
-    # lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, w_istack, w_sstack = lw_regions(bolo, an_opts)
-
     lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = lw_regions(bolo, an_opts)
 
-    # A_legA = dS_ABD*lw + dW1_ABD*lw + dI1_AB*lw + dW2_AC*3 + dI2_A*lw     # S-W1-I1-W2-I2
-    # A_legB = dS_ABD*lw + dW1_ABD*5  + dI1_AB*3  + dW2_B*3  + 0            # S-W1-I1-W2, I1 width is actually = W2 width here from FIB measurements
-    # A_legC = dS_CF*lw  + 0          + dI1_AB*lw + dW2_AC*3 + dI2_A*lw     # S-I1-W2-I2
-    # A_legD = dS_ABD*lw + dW1_ABD*5  + dI_DF*lw  + 0        + 0            # S-W1-I1-I2 (I stack)
-    # A_legE = dSE_W2*lw + (dW_E)*lw  + 0         + 0        + 0            # S-W1-W2 (W stack)
-    # A_legF = dS_CF*lw  + 0          + dI_DF*lw  + 0        + 0            # S-I1-I2 (I stack)
-    # A_legG = dS_G*lw   + 0          + 0         + 0        + 0            # bare S
     A_legA = dS_ABD*lw      + dW1_ABD*w1w_tot + dI1_AB*lw      + dW2_AC*w2w_tot + dI2_A*lw      # S-W1-I1-W2-I2, dI1I2 = dI1 + dI2
     A_legB = dS_ABD*lw      + dW1_ABD*w1w_tot + dI1_AB*w2w_tot + dW2_B*w2w_tot  + 0             # S-W1-I1-W2, I1 width is = W2 width on leg B
     A_legC = dS_CF*lw       + 0               + dI1_C*w1w_tot  + dW2_AC*w1w_tot + dI2_C*w1w_tot + dI1I2_C*(lw-w1w_tot)    # S-I1-W2-I2, W2 is as wide as W1 on this leg
@@ -1342,9 +1457,7 @@ def bolotest_area(bolo, an_opts):
     A_bolo7  = 2*A_legA + 1*A_legC + 1*A_legD
     A_bolo13 = 1*A_legB + 3*A_legG
     A_bolo = np.array([A_bolo1b, A_bolo24, A_bolo23, A_bolo22, A_bolo21, A_bolo20, A_bolo7, A_bolo13])
-    # AoL_bolo = A_bolo/ll   # A/L for bolotest devices
 
-    # return AoL_bolo   # 1b, 24, 23, 22, 21, 20, 7, 13
     return A_bolo   # 1b, 24, 23, 22, 21, 20, 7, 13
 
 def plot_modelvdata(sim_dict, plot_opts, up_bolo=None, title='', plot_bolotest=True, plot_vlength=False, pred_wfit=False, fs=(8,6)):
@@ -1574,6 +1687,8 @@ def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, fs=(9,6), dof=1):
     fn_comments = an_opts['fn_comments']
     sim_data    = sim_dict['sim']['fit_params']
 
+    an_opts['calc_dIeff'] = False     # we don't have this geometry information about legacy devices
+
     ### legacy data
     legacy_Gs = legacy['G170mK']
     legacy_ll = legacy['geometry']['ll']
@@ -1596,13 +1711,6 @@ def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, fs=(9,6), dof=1):
         Gpred_S = np.median(GpredSs, axis=0); sigma_GpredS = np.std(GpredSs, axis=0)     # predictions and error of substrate layers [pW/K]
         Gpred_W = np.median(GpredWs, axis=0); sigma_GpredW = np.std(GpredWs, axis=0)   # predictions and error [pW/K]
         Gpred_I = np.median(GpredIs, axis=0); sigma_GpredI = np.std(GpredIs, axis=0)   # predictions and error [pW/K]
-
-    # if an_opts['stack_N']:
-    #     # bolo_SiNx = copy.deepcopy(legacy)
-    #     # bolo_SiNx['geometry']['layer_ds'][4:11] = np.zeros(7)
-    #     Gpreds_SiNx = Gfrommodel(sim_data, an_opts, legacy, layer='SiNx')
-    #     Gpred_SiNx = np.median(Gpreds_SiNx, axis=0)
-    #     Gpred_I = Gpred_I - Gpred_SiNx
 
     m1lab = 'Model'
     # m1lab = 'Constrained Model'
