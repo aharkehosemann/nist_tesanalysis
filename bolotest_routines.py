@@ -357,13 +357,13 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
     extend_I2    = an_opts.get('extend_I2', False)
     calc_dIeff   = an_opts.get('calc_dIeff', False)
 
+    # if legA: calc_dIeff = False   # turn this off for certain legs
     # if legB: calc_dIeff = False   # turn this off for certain legs
     # if legC: calc_dIeff = False   # turn this off for certain legs
-    if legD: calc_dIeff = False   # turn this off for certain legs
+    # if legD: calc_dIeff = False   # turn this off for certain legs
+    # if legF: calc_dIeff = False   # turn this off for certain legs
 
     # leg-specific geometry adjustments
-    # deltalw_AD   = bolo['geometry'].get('deltalw_AD',   0.0)
-    # deltalw_C    = bolo['geometry'].get('deltalw_C',    0.0)
     deltalw_A    = bolo['geometry'].get('deltalw_A',    0.0)   # width difference for legs A
     deltalw_CD   = bolo['geometry'].get('deltalw_CD',   0.0)   # width difference for legs C and D
     deltaw2w_C   = bolo['geometry'].get('deltaw2w_C',   0.0)
@@ -999,8 +999,21 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
                 wI1I2_nom  = lw
                 wSI1I2_nom = 0.
 
-            GI1I2_nom  = G_layer(fit, dI1I2,       layer='I', model=model) * wI1I2_nom/5  * a_factor * include_I   # rest of leg
-            GSI1I2_nom = G_layer(fit, dSiNx+dI1I2, layer='I', model=model) * wSI1I2_nom/5 * a_factor * include_I   # rest of leg
+            # GI1I2_nom  = G_layer(fit, dI1I2,       layer='I', model=model) * wI1I2_nom/5  * a_factor * include_I   # rest of leg
+            # GSI1I2_nom = G_layer(fit, dSiNx+dI1I2, layer='I', model=model) * wSI1I2_nom/5 * a_factor * include_I   # rest of leg
+
+            if calc_dIeff:   # only works for I stacking and maybe N stacking
+                dI1I20 = dI1I2
+                weff_I1I2 = wSI1I2_nom if stack_N else wI1I2_nom
+                dI1I2  = np.array([deff(fit[ff], weff_I1I2, dI1I20) for ff in np.arange(len(fit))]) if len(fit.shape)>1 else deff(fit, weff_I1I2, dI1I20)
+
+            if calc_dIeff and len(fit.shape) > 1:   # received multiple fits
+                GI1I2_nom  = np.array([G_layer(fit[dd], dI1I2[dd],       layer='I', model=model) for dd in np.arange(len(dI1I2))]) * wI1I2_nom/5  * a_factor * include_I   # rest of leg
+                GSI1I2_nom = np.array([G_layer(fit[dd], dSiNx+dI1I2[dd], layer='I', model=model) for dd in np.arange(len(dI1I2))]) * wSI1I2_nom/5 * a_factor * include_I   # rest of leg
+            else:
+                GI1I2_nom  = G_layer(fit, dI1I2,       layer='I', model=model) * wI1I2_nom/5  * a_factor * include_I   # rest of leg
+                GSI1I2_nom = G_layer(fit, dSiNx+dI1I2, layer='I', model=model) * wSI1I2_nom/5 * a_factor * include_I   # rest of leg
+
 
             # no W layers, therefore nominal I stacks across entire leg
             G_SiNx = 0; G_I1 = 0; GI2_nom = 0; GI2_tallw2 = 0; GI2_tallw1 = 0
@@ -1127,19 +1140,25 @@ def runsim_chisq(bolo, an_opts, plot_opts, save_sim=False):
     n_jobs   = an_opts.get('n_jobs')
     model    = an_opts.get('model', 'Three-Layer')
     p0       = an_opts.get('p0')
-    vary_d   = an_opts['vary_d']
     bounds   = an_opts.get('bounds', [])
     sim_file = an_opts.get('sim_file')
     csv_file = an_opts.get('csv_file')
     ydata    = bolo['data']['ydata']; sigma = bolo['data']['sigma']
+    vary_d   = an_opts['vary_d']
+    vary_w   = an_opts['vary_w']
     layer_ds = bolo['geometry']['layer_ds']
     derrs    = bolo['geometry'].get('derrs', [])
+    layer_ws = bolo['geometry']['layer_ws']
+    werrs    = bolo['geometry'].get('werrs', [])
 
     def iteration(ii):
         # fit model parameters for each simluated set of G data and film thicknesses
 
         it_bolo['geometry']['layer_ds'] = sim_layerds[ii]
-        it_bolo['data']['ydata']        = y_its[ii]
+        it_bolo['geometry']['lw']  = sim_layerws[ii, 0]
+        it_bolo['geometry']['w1w'] = sim_layerws[ii, 1]
+        it_bolo['geometry']['w2w'] = sim_layerws[ii, 2]
+        it_bolo['data']['ydata']   = y_its[ii]
 
         # pfit_it = minimize(chisq_val, p0, args=[an_opts, it_bolo], bounds=bounds)['x']   # minimize chi-squared function with this iteration's G_TES values and film thicknesses
         # print('it chi-sq = {}'.format(chisq_val(pfit_it, [an_opts, bolo])))
@@ -1153,6 +1172,7 @@ def runsim_chisq(bolo, an_opts, plot_opts, save_sim=False):
     # simulate y data and layer thicknesses (if vary_d=True)
     y_its       = np.random.normal(ydata, sigma, size=(num_its, len(ydata)))
     sim_layerds = np.random.normal(layer_ds, derrs, size=(num_its, len(layer_ds))) if vary_d else np.tile(layer_ds, (num_its, 1))
+    sim_layerws = np.random.normal(layer_ws, werrs, size=(num_its, len(layer_ws))) if vary_w else np.tile(layer_ws, (num_its, 1))
 
     it_bolo   = copy.deepcopy(bolo)
     pfits_sim = Parallel(n_jobs=n_jobs, verbose=5)(delayed(iteration)(ii) for ii in range(num_its))
@@ -1167,6 +1187,7 @@ def runsim_chisq(bolo, an_opts, plot_opts, save_sim=False):
     Gpred_Ws = G_bolotest(pfits_sim, an_opts, bolo, layer='W')   # W layer contributions
     Gpred_Is = G_bolotest(pfits_sim, an_opts, bolo, layer='I')   # I layer contributions
     Gwires   = G_bolotest(pfits_sim, an_opts, bolo, layer='wiring').T[0]/4   # function outputs G_microstrip for four legs
+    chisq_fits   = np.array([chisq_val(pfits_sim[ii,:], [an_opts, bolo]) for ii in range(num_its)])
 
     sim_dict = {}
     sim_dict['sim'] = {}   # save simulation arrays
@@ -1178,6 +1199,8 @@ def runsim_chisq(bolo, an_opts, plot_opts, save_sim=False):
     sim_dict['Gpred_Ss'] = Gpred_Ss  # G(d0) predictions using the fit parameters from each iteration
     sim_dict['Gpred_Ws'] = Gpred_Ws  # G(d0) predictions using the fit parameters from each iteration
     sim_dict['Gpred_Is'] = Gpred_Is  # G(d0) predictions using the fit parameters from each iteration
+    sim_dict['Gpred_Is'] = Gpred_Is  # G(d0) predictions using the fit parameters from each iteration
+    sim_dict['chisq_fits'] = chisq_fits
 
     # save analysis options and bolometer geometry/data
     sim_dict['an_opts'] = an_opts
@@ -1278,6 +1301,8 @@ def sort_results(sim_dict, print_results=False, spinds=np.array([])):
     chisq_fit =  chisq_val(sim_params, [an_opts, bolo]); rchisq_fit = chisq_fit/dof
     chisq_pred = chisq_val(sim_params, [an_opts, bolo_pred]); rchisq_pred = chisq_pred/dof
     chisq_qsum = chisq_val(sim_params, [an_opts, bolo_qsum]); rchisq_qsum = chisq_qsum/dof
+    chisq_fits = sim_dict['chisq_fits']
+
 
     # sort final results
     fit_dict = {}
@@ -1313,6 +1338,7 @@ def sort_results(sim_dict, print_results=False, spinds=np.array([])):
         print('Chi-squared (sig_GTES)   : ', round(chisq_fit, 3))#, '; Reduced Chi-squared value: ', round(rchisq_fit, 3))
         print('Chi-squared (sig_Gpred)  : ', round(chisq_pred, 3))#, '; Reduced Chi-squared value: ', round(rchisq_pred, 3))
         # print('Chi-squared (sig_quadsum): ', round(chisq_qsum, 3))#, '; Reduced Chi-squared value: ', round(rchisq_pred, 3))
+        print('Median Chi-squared (sig_GTES) = {:.1f} +/- {:.1f}'.format(np.median(chisq_fits), np.std(chisq_fits)))
         print('\n\n')
 
     return fit_dict
