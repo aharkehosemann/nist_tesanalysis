@@ -3,7 +3,7 @@ from bolotest_routines import *
 
 ### testing suite - test model output
 def test_objs(lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0, dI1=0, dW2=0, dI2=0, d_stacks=np.array([0, 0, 0, 0]), w_stacks=np.array([0, 0, 0, 0, 0]),
-                model='Three-Layer', stack_I=False, stack_N=False, tall_Istacks=False, constrained=False, supG=0.0, calc='Median', deltalw_AD=0.0, extend_I2=False):
+                model='Three-Layer', stack_I=False, stack_N=False, tall_Istacks=False, constrained=False, supG=0.0, calc='Median', deltalw_CD=0.0, extend_I2=False, calc_dIeff=False):
     ### create dummy objects for testing
 
     test_bolo = {}; test_bolo['geometry'] = {}
@@ -21,7 +21,7 @@ def test_objs(lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0, dI1=0,
     test_bolo['geometry']['dSiOx']    = dSiOx   # [um] SiOx thickness of substrate layer
     test_bolo['geometry']['d_stacks'] = d_stacks   # [um] layer thickness adjustments near W1 and W2 edges
     test_bolo['geometry']['w_stacks'] = w_stacks   # [um] widths of layer thickness adjustment regions
-    test_bolo['geometry']['deltalw_AD'] = deltalw_AD   # [um] legs A and D may be skinnier than B, C, E, F, G
+    test_bolo['geometry']['deltalw_CD'] = deltalw_CD   # [um] legs A and D may be skinnier than B, C, E, F, G
 
     test_anopts = {}
     test_anopts['stack_I']        = stack_I   # account for I1-I2 stacks in areas wider than W2
@@ -32,6 +32,7 @@ def test_objs(lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0, dI1=0,
     test_anopts['model']          = model   # Two-, Three-, or Four-Layer model?
     test_anopts['supG']           = supG    # reduce G for substrate on legs B, E & G based on surface roughness
     test_anopts['calc']           = calc   # how to evaluate fit parameters from simluation data - an_opts are 'Mean' and 'Median'
+    test_anopts['calc_dIeff']     = calc_dIeff
 
     return test_bolo, test_anopts
 
@@ -192,7 +193,7 @@ def test_alphascaleI(verbose=False):
 def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0.200, dI1=0.400, dW2=0.350, dI2=0.400,
                     manual_calc = False, plot_vwidth=False, lwrange=np.arange(5,40), plot_vdsub=False, dsrange=np.arange(0.400, 2.500),
                     legA=False, legB=False, legC=False, legD=False, legE=False, legF=False, legG=False,
-                    verbose=False, tall_Istacks=False, d_stacks=np.array([0, 0, 0, 0]), w_stacks=np.array([0, 0, 0, 0, 0]), deltalw_AD=0.0, extend_I2=False):
+                    verbose=False, tall_Istacks=False, d_stacks=np.array([0, 0, 0, 0]), w_stacks=np.array([0, 0, 0, 0, 0]), deltalw_CD=0.0, extend_I2=False, calc_dIeff=False):
     # compare output between I-layer stacking at w > w1w ("no stacking / status quo / 0"), I-layer stacking at w > w2w, and nitride stacking
     # can look at different outputs for different legs vs width or thickness
     # manual_calc currently only works for leg A
@@ -278,27 +279,27 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
 
     if plot_vwidth:
 
-        delta_lw = deltalw_AD if legA or legD else 0   # leg A and D seem to have a different width than the others
+        delta_lw = deltalw_CD if legC or legD else 0   # leg A and D seem to have a different width than the others
 
-        bolo0_lw, anopts0_lw = test_objs(lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks, extend_I2=extend_I2)
-        G0_lw  = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
-        G0S_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
-        G0W_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
-        G0I_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
+        bolo0_lw, anopts0_lw = test_objs(lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks, extend_I2=extend_I2, calc_dIeff=calc_dIeff)
+        G0_lw  = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
+        G0S_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
+        G0W_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
+        G0I_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
         assert all([G >= 0 for G in np.array([G0_lw, G0S_lw, G0W_lw, G0I_lw]).flat]), "G < 0"
 
-        boloI_lw, anoptsI_lw = test_objs(stack_I=True, lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks, extend_I2=extend_I2)
-        GI_lw  = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
-        GIS_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
-        GIW_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
-        GII_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
+        boloI_lw, anoptsI_lw = test_objs(stack_I=True, lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks, extend_I2=extend_I2, calc_dIeff=calc_dIeff)
+        GI_lw  = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
+        GIS_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
+        GIW_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
+        GII_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
         assert all([G >= 0 for G in np.array([GI_lw, GIS_lw, GIW_lw, GII_lw]).flat]), "G < 0"
 
-        boloN_lw, anoptsN_lw = test_objs(stack_N=True, lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks, extend_I2=extend_I2)
-        GN_lw  = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
-        GNS_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
-        GNW_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
-        GNI_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
+        boloN_lw, anoptsN_lw = test_objs(stack_N=True, lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks, extend_I2=extend_I2, calc_dIeff=calc_dIeff)
+        GN_lw  = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
+        GNS_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
+        GNW_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
+        GNI_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
         assert all([G >= 0 for G in np.array([GN_lw, GNS_lw, GNW_lw, GNI_lw]).flat]), "G < 0"
 
         # if legC: w2w = w1w; w1w = np.inf   # w2w is width of w1w on leg C, no w1w
@@ -369,27 +370,29 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         # plt.grid(linestyle = '--', which='both', linewidth=0.5)   # grid lines on plot
         # plt.legend()
 
-        # plt.figure(figsize=(10,5.5))
-        # plt.plot(lwrange/2, G0I_lw,       alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
-        # plt.plot(lwrange/2, GII_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
-        # plt.plot(lwrange/2, GNI_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
-        # # plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
-        # plt.vlines([w2w/2, w1w/2, (lw+delta_lw)/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.7, color='k')
-        # if tall_Istacks:
-        #     plt.vlines([np.array([w2w-w_stacks[0], w2w+w_stacks[1]])/2, np.array([w1w-w_stacks[2], w1w+w_stacks[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
-        # elif extend_I2:
-        #     plt.vlines(np.array([w2w+w_stacks[4], w2w+w_stacks[1]])/2, 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
-        # # plt.annotate('W2', (w2w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
-        # # plt.annotate('W1', (w1w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
-        # plt.annotate('W2', ((w2w-0.2)/2, np.max(GNI_lw)*0.05), bbox=dict(boxstyle='square,pad=0.3', fc='w', ec='k', lw=1))
-        # plt.annotate('W1', ((w1w-0.2)/2, np.max(GNI_lw)*0.05), bbox=dict(boxstyle='square,pad=0.3', fc='w', ec='k', lw=1))
-        # plt.annotate('leg', ((lw+delta_lw-0.15)/2,  np.max(GNI_lw)*0.15), bbox=dict(boxstyle='square,pad=0.3', fc='w', ec='k', lw=1))
-        # plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_I$ [pW/K]')
-        # plt.ylim(min(GNI_lw)*0., np.nanmax([G0I_lw, GII_lw, GNI_lw])*1.1)
-        # # plt.ylim(min(GNI_lw)*0., 14)
-        # plt.xlim(min(lwrange)/2, max(lwrange)/2)
-        # plt.grid(linestyle = '--', which='both', linewidth=0.5)   # grid lines on plot
-        # plt.legend()
+        # params_test = np.array([0.507, 1.08, 1.66, -0.686, -0.384, -1.])
+
+        plt.figure(figsize=(10,5.5))
+        plt.plot(lwrange/2, G0I_lw,       alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
+        plt.plot(lwrange/2, GII_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
+        plt.plot(lwrange/2, GNI_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
+        # plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
+        plt.vlines([w2w/2, w1w/2, (lw+delta_lw)/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.7, color='k')
+        if tall_Istacks:
+            plt.vlines([np.array([w2w-w_stacks[0], w2w+w_stacks[1]])/2, np.array([w1w-w_stacks[2], w1w+w_stacks[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
+        elif extend_I2:
+            plt.vlines(np.array([w2w+w_stacks[4], w2w+w_stacks[1]])/2, 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
+        # plt.annotate('W2', (w2w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
+        # plt.annotate('W1', (w1w/2-0.3, GNI_lw[5]))            # plt.xlabel('Leg Width [um]'); plt.ylabel('G [pW/K]')
+        plt.annotate('W2', ((w2w-0.2)/2, np.max(GNI_lw)*0.05), bbox=dict(boxstyle='square,pad=0.3', fc='w', ec='k', lw=1))
+        plt.annotate('W1', ((w1w-0.2)/2, np.max(GNI_lw)*0.05), bbox=dict(boxstyle='square,pad=0.3', fc='w', ec='k', lw=1))
+        plt.annotate('leg', ((lw+delta_lw-0.15)/2,  np.max(GNI_lw)*0.15), bbox=dict(boxstyle='square,pad=0.3', fc='w', ec='k', lw=1))
+        plt.xlabel('1/2 Leg Width [$\mu m$]'); plt.ylabel('G$_I$ [pW/K]')
+        plt.ylim(min(GNI_lw)*0., np.nanmax([G0I_lw, GII_lw, GNI_lw])*1.1)
+        # plt.ylim(min(GNI_lw)*0., 14)
+        plt.xlim(min(lwrange)/2, max(lwrange)/2)
+        plt.grid(linestyle = '--', which='both', linewidth=0.5)   # grid lines on plot
+        plt.legend()
 
         # plt.figure(figsize=(10,5.5))
         # plt.plot(lwrange/2, G0S_lw + G0I_lw,       alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
