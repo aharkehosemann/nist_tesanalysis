@@ -268,7 +268,7 @@ def deff(fit, wI, d_2walls, d_1wall=1E-12, d_0walls=1E-12):   # calculate effect
     # d_2walls = thickness of layer section with two sidewalls
 
     if len(np.shape(wI))>1:   # handle single leg widths
-        d_2walls = d_2walls.reshape(-1, 1); d_1wall = d_1wall.reshape(-1, 1); d_0wall = d_0walls.reshape(-1, 1)
+        d_2walls = d_2walls.reshape(-1, 1); d_1wall = d_1wall.reshape(-1, 1); d_0walls = d_0walls.reshape(-1, 1)
 
     numrows = fit.shape[0]   # num of rows determines type of fit passed
     if numrows==1 or len(fit.shape)==1:   # user passed one set of fit parameters with no error bars
@@ -286,64 +286,52 @@ def deff(fit, wI, d_2walls, d_1wall=1E-12, d_0walls=1E-12):   # calculate effect
 
     return d_eff
 
-def wI1I2s_deff(region_ws, dIs, dWs, legA=False, legC=False, legD=False, deltawI1I2_A=0., left_frac=0.75):
-
+# def wI1I2s_deff(region_ws, dIs, dWs, legA=False, legC=False, legD=False, deltawI1I2_A=0., left_frac=0.75):
+# def wI1I2s_deff(region_ws, dIs, dWs, legA=False, legC=False, legD=False, deltawI1I2_A=0., left_frac=1.0):
+def wI1I2s_deff(region_ws, wI1I2_nom, dI1I20, dI10, dW1, legA=False, legC=False, legD=False, deltawI1I2_A=0., left_frac=1.0):
+    # currently does not work for N stacking
+    # returns [wI1I2_a, wI1I2_b, wI1I2_c, wI1I2_d], [d_2walls in those regions], [d_1wall in those regions], [d_0walls in those regions]
     # dI10 = dI1; dI20 = dI2; dI1I20 = dI1I2
-    dI10, dI1I20 = dIs
-    dW1, dW2 = dWs
+    # dI10, dI1I20 = dIs
+    # dW1,  dW2 = dWs
     lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = region_ws
 
     if legA:
-        wI1I2_nom = lw - (w2w_tot + w2w_e + w1w_s + w1w_e)
-        wI1I2_3   = (w1w_ns - (w2w_tot + w2w_e) + deltawI1I2_A)/2
-        wI1I2_4   = (w1w_ns - (w2w_tot + w2w_e) + deltawI1I2_A)/2
-        # wI1I2_5       = (wI1I2_nom - wI1I2_3and4*2)
-        # wI1I2_5   = (wI1I2_nom - wI1I2_3 - wI1I2_4) * left_frac
-        # wI1I2_6   = (wI1I2_nom - wI1I2_3 - wI1I2_4) * (1-left_frac)
-        # wI1I2_regions = np.array([wI1I2_3and4, wI1I2_3and4, wI1I2_5])
-        # wI1I2_regions = np.array([wI1I2_3and4, wI1I2_3and4, wI1I2_5, wI1I2_6])
+        # wI1I2_nom = lw - (w2w_tot + w2w_e + w1w_s + w1w_e) + deltawI1I2_A
+        wI1I2_a   = (w1w_ns - (w2w_tot + w2w_e) + deltawI1I2_A)/2
 
-        # dI1I2_2walls  = np.array([dI1I20-dI10,  dI1I20-dI10, dW1])
-        # dI1I2_1wall   = np.array([dI10,        dI10,         dI1I20-dW1])
         dI1I2_2walls  = np.array([dI1I20-dI10,                dI1I20-dI10,                dW1,                        dW1])
         dI1I2_1wall   = np.array([1E-12*np.ones_like(dI1I20), 1E-12*np.ones_like(dI1I20), dI1I20-dW1,                 dI1I20-dW1])
         dI1I2_0walls  = np.array([dI10,                       dI10,                       1E-12*np.ones_like(dI1I20), 1E-12*np.ones_like(dI1I20)])
     elif legC:
-        wI1I2_nom = lw - (w2w_tot + w2w_e)
-        wI1I2_3   = 1E-12*np.ones_like(lw)
-        wI1I2_4   = 1E-12*np.ones_like(lw)
-        # wI1I2_5       = (wI1I2_nom - wI1I2_3and4*2)
-        # wI1I2_5   = (wI1I2_nom - wI1I2_3 - wI1I2_4) * left_frac
-        # wI1I2_6   = (wI1I2_nom - wI1I2_3 - wI1I2_4) * (1-left_frac)
+        # wI1I2_nom = lw - (w2w_tot + w2w_e)
+        wI1I2_a   = 1E-12*np.ones_like(lw)
 
-        # wI1I2_regions = np.array([wI1I2_3and4, wI1I2_3and4, wI1I2_5])
-        # wI1I2_regions = np.array([wI1I2_3and4, wI1I2_3and4, wI1I2_5, wI1I2_6])
-
-        # dI1I2_2walls  = np.array([1E-12*np.ones_like(dI1I20), 1E-12*np.ones_like(dI1I20), dI1I20-dI10])
-        # dI1I2_1wall   = np.array([1E-12*np.ones_like(dI1I20), 1E-12*np.ones_like(dI1I20), dI10])
         dI1I2_2walls  = np.array([1E-12*np.ones_like(dI1I20), 1E-12*np.ones_like(dI1I20), dI1I20-dI10,                dI1I20-dI10])
         dI1I2_1wall   = np.array([1E-12*np.ones_like(dI1I20), 1E-12*np.ones_like(dI1I20), dI10,                       dI10])
         dI1I2_0walls  = np.array([1E-12*np.ones_like(dI1I20), 1E-12*np.ones_like(dI1I20), 1E-12*np.ones_like(dI1I20), 1E-12*np.ones_like(dI1I20)])
     elif legD:   # no section 4, treat I1I2 on W1 as single region 3 layer
-        wI1I2_nom = lw - w1w_e
-        wI1I2_3   = w1w_tot   # treat I1I2 on top of W1 as single double-walled layer
-        wI1I2_4   = 1E-12*np.ones_like(lw)
-        # wI1I2_5       = wI1I2_nom - wI1I2_3
-        # wI1I2_5       = (wI1I2_nom - wI1I2_3 - wI1I2_4) * left_frac
-        # wI1I2_6       = (wI1I2_nom - wI1I2_3 - wI1I2_4) * (1-left_frac)
-        # wI1I2_regions = np.array([wI1I2_3, 1E-12*np.ones_like(lw), wI1I2_5])
-        # wI1I2_regions = np.array([wI1I2_3, wI1I2_4, wI1I2_5, wI1I2_6])
+        # wI1I2_nom = lw - w1w_e
+        wI1I2_a   = w1w_tot   # treat I1I2 on top of W1 as single double-walled layer
 
-        # dI1I2_2walls  = np.array([dI1I20, 1E-12*np.ones_like(dI1I20), dW1])
-        # dI1I2_1wall   = np.array([1E-12*np.ones_like(dI1I20), 1E-12*np.ones_like(dI1I20), dI1I20-dW1])
         dI1I2_2walls  = np.array([dW1,                        1E-12*np.ones_like(dI1I20), dW1,                        dW1])
         dI1I2_1wall   = np.array([1E-12*np.ones_like(dI1I20), 1E-12*np.ones_like(dI1I20), dI1I20-dW1,                 dI1I20-dW1])
         dI1I2_0walls  = np.array([dI1I20-dW1,                 1E-12*np.ones_like(dI1I20), 1E-12*np.ones_like(dI1I20), 1E-12*np.ones_like(dI1I20)])
 
-    wI1I2_5       = (wI1I2_nom - wI1I2_3 - wI1I2_4) * left_frac
-    wI1I2_6       = (wI1I2_nom - wI1I2_3 - wI1I2_4) * (1-left_frac)
-    wI1I2_regions = np.array([wI1I2_3, wI1I2_4, wI1I2_5, wI1I2_6])
+    wI1I2_b       = wI1I2_a
+    wI1I2_c       = (wI1I2_nom - wI1I2_a - wI1I2_b) * left_frac
+    wI1I2_d       = (wI1I2_nom - wI1I2_a - wI1I2_b) * (1-left_frac)
+    wI1I2_regions = np.array([wI1I2_a, wI1I2_b, wI1I2_c, wI1I2_d])
     return wI1I2_regions, dI1I2_2walls, dI1I2_1wall, dI1I2_0walls
+
+def calc_deffI1I2(fit, region_ws, wI1I2_nom, dI1I20, dI10, dW1, left_frac=1., legA=False, legC=False, legD=False, deltawI1I2_A=0.):
+    # region_ws = lw_regions(bolo, an_opts)
+    # deltawI1I2_A = bolo['geometry'].get('deltawI1I2_A', 0.0)
+
+    wI1I2_regions, dI1I2_2walls, dI1I2_1wall, dI1I2_0walls = wI1I2s_deff(region_ws, wI1I2_nom, dI1I20, dI10, dW1, legA=legA, legC=legC, legD=legD, deltawI1I2_A=deltawI1I2_A, left_frac=left_frac)
+
+    dI1I2 = np.array([deff(fit[ff], wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall, d_0walls=dI1I2_0walls) for ff in np.arange(len(fit))]) if len(fit.shape)>1 else deff(fit, wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall, d_0walls=dI1I2_0walls)
+    return dI1I2
 
 def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, include_I, dI1I2=0., sup_roughGS_width=0.,
           legA=False, legB=False, legC=False, legD=False, legE=False, legF=False, legG=False):
@@ -356,6 +344,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
     tall_Istacks = an_opts.get('tall_Istacks')
     extend_I2    = an_opts.get('extend_I2', False)
     calc_dIeff   = an_opts.get('calc_dIeff', False)
+    left_frac    = an_opts.get('left_frac', False)
 
     # if legA: calc_dIeff = False   # turn this off for certain legs
     # if legB: calc_dIeff = False   # turn this off for certain legs
@@ -399,14 +388,14 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
     region_ws = lw_regions(bolo, an_opts, delta_lw=delta_lw, delta_w2w=delta_w2w)
     lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = region_ws
 
-    if calc_dIeff and (legA or legC or legD):   # only works for I stacking and maybe N stacking
-        dI10 = dI1; dI20 = dI2; dI1I20 = dI1I2
+    # if calc_dIeff and (legA or legC or legD):   # only works for I stacking and maybe N stacking
+    #     dI10 = dI1; dI20 = dI2; dI1I20 = dI1I2
 
-        # wI1I2_regions, dI1I2_2walls, dI1I2_1wall = wI1I2s_deff(region_ws, [dI10, dI1I20], [dW1, dW2], legD=True)
-        wI1I2_regions, dI1I2_2walls, dI1I2_1wall, dI1I2_0walls = wI1I2s_deff(region_ws, [dI10, dI1I20], [dW1, dW2], legA=legA, legC=legC, legD=legD, deltawI1I2_A=deltawI1I2_A)
+    #     # wI1I2_regions, dI1I2_2walls, dI1I2_1wall = wI1I2s_deff(region_ws, [dI10, dI1I20], [dW1, dW2], legD=True)
+    #     wI1I2_regions, dI1I2_2walls, dI1I2_1wall, dI1I2_0walls = wI1I2s_deff(region_ws, [dI10, dI1I20], [dW1, dW2], legA=legA, legC=legC, legD=legD, deltawI1I2_A=deltawI1I2_A, left_frac=left_frac)
 
-        # dI2   = np.array([deff(fit[ff], wI2_nom, dI20) for ff in np.arange(len(fit))])                                    if len(fit.shape)>1 else deff(fit, wI2_nom, dI20)
-        dI1I2 = np.array([deff(fit[ff], wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall, d_0walls=dI1I2_0walls) for ff in np.arange(len(fit))]) if len(fit.shape)>1 else deff(fit, wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall, d_0walls=dI1I2_0walls)
+    #     # dI2   = np.array([deff(fit[ff], wI2_nom, dI20) for ff in np.arange(len(fit))])                                    if len(fit.shape)>1 else deff(fit, wI2_nom, dI20)
+    #     dI1I2 = np.array([deff(fit[ff], wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall, d_0walls=dI1I2_0walls) for ff in np.arange(len(fit))]) if len(fit.shape)>1 else deff(fit, wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall, d_0walls=dI1I2_0walls)
 
     dSE_W1 = bolo['geometry']['layer_ds'][3]; dSE_b = bolo['geometry']['layer_ds'][4]
 
@@ -686,8 +675,13 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             G_I1       = G_layer(fit, dI1, layer='I', model=model)   * wI1_nom/5   * a_factor * include_I
 
             if calc_dIeff:   # only works for I stacking and maybe N stacking
+                dI10 = dI1; dI20 = dI2; dI1I20 = dI1I2
                 dI2   = np.array([deff(fit[ff], wI2_nom, dI20) for ff in np.arange(len(fit))])                                    if len(fit.shape)>1 else deff(fit, wI2_nom, dI20)
-
+            # if calc_dIeff:   # only works for I stacking and maybe N stacking
+                # wI1I2_regions, dI1I2_2walls, dI1I2_1wall, dI1I2_0walls = wI1I2s_deff(region_ws, [dI10, dI1I20], [dW1, dW2], legA=legA, legC=legC, legD=legD, deltawI1I2_A=deltawI1I2_A, left_frac=left_frac)
+                # wI1I2_regions, dI1I2_2walls, dI1I2_1wall, dI1I2_0walls = wI1I2s_deff(region_ws, wI1I2_nom, dI1I20, dI10, dW1, legA=legA, legC=legC, legD=legD, deltawI1I2_A=deltawI1I2_A, left_frac=left_frac)
+                # dI1I2 = np.array([deff(fit[ff], wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall, d_0walls=dI1I2_0walls) for ff in np.arange(len(fit))]) if len(fit.shape)>1 else deff(fit, wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall, d_0walls=dI1I2_0walls)
+                dI1I2 = calc_deffI1I2(fit, region_ws, wI1I2_nom, dI1I20, dI10, dW1, left_frac=left_frac, legA=legA, legC=legC, legD=legD)
             #     # wI1I2_regions, dI1I2_2walls, dI1I2_1wall = wI1I2s_deff(region_ws, [dI10, dI1I20], [dW1, dW2], legA=True, deltawI1I2_A=deltawI1I2_A)
             #     wI1I2_regions, dI1I2_2walls, dI1I2_1wall, dI1I2_0walls = wI1I2s_deff(region_ws, [dI10, dI1I20], [dW1, dW2], legA=True, deltawI1I2_A=deltawI1I2_A)
 
@@ -840,10 +834,16 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             #     # wI1I2_regions, dI1I2_2walls, dI1I2_1wall = wI1I2s_deff(region_ws, [dI10, dI1I20], [dW1, dW2], legC=True)
             #     wI1I2_regions, dI1I2_2walls, dI1I2_1wall, dI1I2_0walls = wI1I2s_deff(region_ws, [dI10, dI1I20], [dW1, dW2], legC=True)
 
+                dI10 = dI1; dI20 = dI2; dI1I20 = dI1I2
                 dI2   = np.array([deff(fit[ff], wI2_nom, dI20) for ff in np.arange(len(fit))])                                    if len(fit.shape)>1 else deff(fit, wI2_nom, dI20)
             #     dI1I2 = np.array([deff(fit[ff], wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall, d_0walls=dI1I2_0walls) for ff in np.arange(len(fit))]) if len(fit.shape)>1 else deff(fit, wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall, d_0walls=dI1I2_0walls)
             #     # assert np.all(dI2   <= dI20),   'dI2_eff ({}) is > dI20 ({}) on Leg C'.format(dI2, dI20)
             #     # assert np.all(dI1I2 <= dI1I20), 'dI1I2_eff ({}) is > dI1I20 ({}) on Leg C'.format(dI1I2, dI1I20)
+            # if calc_dIeff:   # only works for I stacking and maybe N stacking
+                # wI1I2_regions, dI1I2_2walls, dI1I2_1wall, dI1I2_0walls = wI1I2s_deff(region_ws, [dI10, dI1I20], [dW1, dW2], legA=legA, legC=legC, legD=legD, deltawI1I2_A=deltawI1I2_A, left_frac=left_frac)
+                # wI1I2_regions, dI1I2_2walls, dI1I2_1wall, dI1I2_0walls = wI1I2s_deff(region_ws, wI1I2_nom, dI1I20, dI10, dW1, legA=legA, legC=legC, legD=legD, deltawI1I2_A=deltawI1I2_A, left_frac=left_frac)
+                # dI1I2 = np.array([deff(fit[ff], wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall, d_0walls=dI1I2_0walls) for ff in np.arange(len(fit))]) if len(fit.shape)>1 else deff(fit, wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall, d_0walls=dI1I2_0walls)
+                dI1I2 = calc_deffI1I2(fit, region_ws, wI1I2_nom, dI1I20, dI10, dW1, left_frac=left_frac, legA=legA, legC=legC, legD=legD)
 
             if calc_dIeff and len(fit.shape) > 1:   # received multiple fits
             # if False:
@@ -918,12 +918,12 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
             wSiNx_nom    = w1w_tot if stack_N else 0
             G_SiNx       = G_layer(fit, dSiNx, layer='I', model=model) * wSiNx_nom/5 * a_factor * include_I
 
-            # if calc_dIeff:   # only works for I stacking and maybe N stacking
-            #     # wI1I2_regions, dI1I2_2walls, dI1I2_1wall = wI1I2s_deff(region_ws, [dI10, dI1I20], [dW1, dW2], legD=True)
-            #     wI1I2_regions, dI1I2_2walls, dI1I2_1wall, dI1I2_0walls = wI1I2s_deff(region_ws, [dI10, dI1I20], [dW1, dW2], legD=True)
-
-            #     dI1I2 = np.array([deff(fit[ff], wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall, d_0walls=dI1I2_0walls) for ff in np.arange(len(fit))]) if len(fit.shape)>1 else deff(fit, wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall, d_0walls=dI1I2_0walls)
-            #     # assert np.all(dI1I2 <= dI1I20), 'dI1I2_eff ({}) is > dI1I20 ({}) on Leg D'.format(dI1I2, dI1I20)
+            if calc_dIeff:   # only works for I stacking and maybe N stacking
+                dI10 = dI1; dI20 = dI2; dI1I20 = dI1I2
+                # wI1I2_regions, dI1I2_2walls, dI1I2_1wall, dI1I2_0walls = wI1I2s_deff(region_ws, [dI10, dI1I20], [dW1, dW2], legA=legA, legC=legC, legD=legD, deltawI1I2_A=deltawI1I2_A, left_frac=left_frac)
+                # wI1I2_regions, dI1I2_2walls, dI1I2_1wall, dI1I2_0walls = wI1I2s_deff(region_ws, wI1I2_nom, dI1I20, dI10, dW1, legA=legA, legC=legC, legD=legD, deltawI1I2_A=deltawI1I2_A, left_frac=left_frac)
+                # dI1I2 = np.array([deff(fit[ff], wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall, d_0walls=dI1I2_0walls) for ff in np.arange(len(fit))]) if len(fit.shape)>1 else deff(fit, wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall, d_0walls=dI1I2_0walls)
+                dI1I2 = calc_deffI1I2(fit, region_ws, wI1I2_nom, dI1I20, dI10, dW1, left_frac=left_frac, legA=legA, legC=legC, legD=legD)
 
             if calc_dIeff and len(fit.shape) > 1:   # received multiple fits
 
@@ -1154,11 +1154,11 @@ def runsim_chisq(bolo, an_opts, plot_opts, save_sim=False):
     def iteration(ii):
         # fit model parameters for each simluated set of G data and film thicknesses
 
-        it_bolo['geometry']['layer_ds'] = sim_layerds[ii]
-        it_bolo['geometry']['lw']  = sim_layerws[ii, 0]
-        it_bolo['geometry']['w1w'] = sim_layerws[ii, 1]
-        it_bolo['geometry']['w2w'] = sim_layerws[ii, 2]
-        it_bolo['data']['ydata']   = y_its[ii]
+        it_bolo['geometry']['layer_ds'] = sim_layerds[ii]   # vary thicknesses
+        it_bolo['geometry']['lw']       = sim_layerws[ii, 0]   # vary widths
+        it_bolo['geometry']['w1w']      = sim_layerws[ii, 1]
+        it_bolo['geometry']['w2w']      = sim_layerws[ii, 2]
+        it_bolo['data']['ydata']        = y_its[ii]   # vary measured GTES
 
         # pfit_it = minimize(chisq_val, p0, args=[an_opts, it_bolo], bounds=bounds)['x']   # minimize chi-squared function with this iteration's G_TES values and film thicknesses
         # print('it chi-sq = {}'.format(chisq_val(pfit_it, [an_opts, bolo])))
@@ -1898,10 +1898,10 @@ def predict_Glegacy(sim_dict, plot_opts, legacy, bolotest={}, fs=(9,6), dof=1):
         plt.plot(legacy_x, legacy_Gs,                marker='o', markersize=9, linestyle='None', color='darkorange', label='Legacy Data')
         plt.errorbar(legacy_x, Gpred, yerr=sigma_Gpred,  marker='*', markersize=11, linestyle='None', color='k', label=m1lab, capsize=3, alpha=0.4)
 
-    plt.plot(    legacy_x, Gpred_S, color='blue',       marker='d', markersize=7,  label='G$_\\text{S}$', linestyle='None')
-    plt.plot(    legacy_x, Gpred_I, color='blueviolet', marker='s', markersize=5,  label='G$_\\text{I}$', linestyle='None', alpha=0.8)#, fillstyle='none', markeredgewidth=1.5)
-    plt.plot(    legacy_x, Gpred_W, color='green',      marker='v', markersize=8,  label='G$_\\text{W}$', linestyle='None', alpha=0.8)#, fillstyle='none', markeredgewidth=1.5)
-    lorder = [0, 1, 2, 3, 4]
+    # plt.plot(    legacy_x, Gpred_S, color='blue',       marker='d', markersize=7,  label='G$_\\text{S}$', linestyle='None')
+    # plt.plot(    legacy_x, Gpred_I, color='blueviolet', marker='s', markersize=5,  label='G$_\\text{I}$', linestyle='None', alpha=0.8)#, fillstyle='none', markeredgewidth=1.5)
+    # plt.plot(    legacy_x, Gpred_W, color='green',      marker='v', markersize=8,  label='G$_\\text{W}$', linestyle='None', alpha=0.8)#, fillstyle='none', markeredgewidth=1.5)
+    # lorder = [0, 1, 2, 3, 4]
     # if an_opts['stack_N']:
     #     plt.plot(legacy_x, Gpred_SiNx, color='r', marker='s', markersize=5,  label='G$_\\text{SiNx}$', linestyle='None', alpha=0.8)#, fillstyle='none', markeredgewidth=1.5)
     #     lorder = [0, 4, 1, 2, 3, 5]
