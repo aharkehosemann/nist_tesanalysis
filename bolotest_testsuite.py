@@ -548,47 +548,47 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False):
 
     deff_calc = (d*mfp**alpha)**(1/(1+alpha))
 
-    fit = np.array([1, 1, 1, 0, 0, 1])
+    fit = np.array([1, 1, 1, 0, 0, alpha])
     deff_func = deff(fit, w, d)
 
     out_ratio        = round(deff_func/deff_calc, 3)
     assert out_ratio == 1, "deff(function) / deff(hand calc) = {} != 1".format(out_ratio)
 
-    # A and C are the same if:
-    # widths of regions 3 and 4 = 0
+    # A, C, and D are the same if:
+    # widths of regions a and b = 0
     # dW1 = dI1 = dI1I2/2
-    d_AC = 2
-    dI1I2_AC = 2*d_AC
+    d_ACD = 2; dI1I2_ACD = 2*d_ACD
+    lw = 6
 
-    bolo_AC, anopts_AC = test_objs(stack_I=True, w1w=1E-12, w2w=1E-12, dI1=d_AC, dI2=d_AC, dW1=d_AC)
+    bolo_ACD, anopts_ACD = test_objs(stack_I=True, w1w=1E-12, w2w=1E-12, lw=lw, dI1=d_ACD, dI2=d_ACD, dW1=d_ACD)
+
+    mfpIcalc_2walls = 1/(1/dI1I2_ACD + 1/lw)
+    mfpIcalc_1wall  = 1/(1/dI1I2_ACD + 1/(2*lw))
+    deffI_calc = (dI1I2_ACD * mfpIcalc_2walls**alpha)**(1/(1+alpha))*0.5 + (dI1I2_ACD * mfpIcalc_1wall**alpha)**(1/(1+alpha))*0.5
 
     # leg A
-    regionws_A = lw_regions(bolo_AC, anopts_AC)
-    # wI1I2_A, dI1I2_2A, dI1I2_1A, dI1I2_0A = wI1I2s_deff(regionws_A, [d_AC, dI1I2_AC], [d_AC, 1E-12], left_frac=left_frac, legA=True)
-    wI1I2_A, dI1I2_2A, dI1I2_1A, dI1I2_0A = wI1I2s_deff(regionws_A, wI1I2nom_A, dI1I2_AC, dI10, d_AC, legA=True, left_frac=left_frac)
-    dI1I2eff_A = deff(fit, wI1I2_A, dI1I2_2A, d_1wall=dI1I2_1A, d_0walls=dI1I2_0A)
-    # wI1I2tot_A = np.sum(wI1I2_A)
-
-    # def calc_deffI1I2(bolo, an_opts, fit, wI1I2_nom, dI1I20, dI10, dW1, deltawI1I2_A=0., legA=False, legC=False, legD=False):
-    #     region_ws = lw_regions(bolo, an_opts)
-    #     wI1I2_regions, dI1I2_2walls, dI1I2_1wall, dI1I2_0walls = wI1I2s_deff(region_ws, wI1I2_nom, dI1I20, dI10, dW1, legA=legA, legC=legC, legD=legD, deltawI1I2_A=deltawI1I2_A, left_frac=left_frac)
-    #     dI1I2 = np.array([deff(fit[ff], wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall, d_0walls=dI1I2_0walls) for ff in np.arange(len(fit))]) if len(fit.shape)>1 else deff(fit, wI1I2_regions, dI1I2_2walls, d_1wall=dI1I2_1wall, d_0walls=dI1I2_0walls)
-    #     return dI1I2
+    regionws_A   = lw_regions(bolo_ACD, anopts_ACD); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_A
+    wI1I2nom_ACD = lw - (w2w_tot + w2w_e)
+    dI1I2eff_A   = deff_I1I2(fit, regionws_A, wI1I2nom_ACD, dI1I2_ACD, d_ACD, d_ACD, legA=True, left_frac=left_frac)
 
     # leg C
-    deltaw2w_C = bolo_AC['geometry']['w1w'] - bolo_AC['geometry']['w2w']
-    regionws_C = lw_regions(bolo_AC, anopts_AC, delta_w2w=deltaw2w_C)
-    # wI1I2_C, dI1I2_2C, dI1I2_1C, dI1I2_0C = wI1I2s_deff(regionws_C, [d_AC, 2*d_AC], [d_AC, 1E-12], left_frac=left_frac, legC=True)
-    lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_C
-    wI1I2nom_C = lw - (w2w_tot + w2w_e)
-    wI1I2_C, dI1I2_2C, dI1I2_1C, dI1I2_0C = wI1I2s_deff(regionws_C, wI1I2nom_C, dI1I2_AC, dI10, d_AC, legC=True, left_frac=left_frac)
-    dI1I2eff_C = deff(fit, wI1I2_C, dI1I2_2C, d_1wall=dI1I2_1C, d_0walls=dI1I2_0C)
-    # wI1I2tots_C = np.sum(wI1I2regions_C, axis=0)
+    deltaw2w_C = bolo_ACD['geometry']['w1w'] - bolo_ACD['geometry']['w2w']
+    regionws_C = lw_regions(bolo_ACD, anopts_ACD, delta_w2w=deltaw2w_C); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_C
+    # wI1I2nom_C = lw - (w2w_tot + w2w_e)
+    dI1I2eff_C = deff_I1I2(fit, regionws_C, wI1I2nom_ACD, dI1I2_ACD, d_ACD, d_ACD, legC=True, left_frac=left_frac)
 
-    # dI1I2eff_C = dI1I2eff_A
+    # leg D
+    regionws_D = lw_regions(bolo_ACD, anopts_ACD); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_D
+    dI1I2eff_D = deff_I1I2(fit, regionws_D, wI1I2nom_ACD, dI1I2_ACD, d_ACD, d_ACD, legD=True, left_frac=left_frac)
+
+    Avscalc = round(dI1I2eff_A/deffI_calc, 3)
+    assert Avscalc == 1, "deff_A / hand-calcluated deff = {} != 1".format(Avscalc)
 
     AoverC = round(dI1I2eff_A/dI1I2eff_C, 3)
     assert AoverC == 1, "deff_A / deff_C = {} != 1, but it should in this instance".format(AoverC)
+
+    AoverD = round(dI1I2eff_A/dI1I2eff_D, 3)
+    assert AoverD == 1, "deff_A / deff_D = {} != 1, but it should in this instance".format(AoverD)
 
 
     if plot_deff:
@@ -623,40 +623,57 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False):
         dI1I2_test = np.linspace(dI10, 1.000)
 
         # leg A
-        regionws_A = lw_regions(test_bolo, test_anopts)
-        wI1I2regions_A, dI1I22walls_A, dI1I21wall_A, dI1I20walls_A = wI1I2s_deff(regionws_A, [dI10*np.ones_like(dI1I2_test), dI1I2_test], [dW10*np.ones_like(dI1I2_test), dW20*np.ones_like(dI1I2_test)], left_frac=left_frac, legA=True)
-        dI1I2eff_A = np.array([deff(fit, wI1I2regions_A, dI1I22walls_A[:,dd], d_1wall=dI1I21wall_A[:,dd], d_0walls=dI1I20walls_A[:,dd]) for dd in np.arange(len(dI1I2_test))])
-        wI1I2tots_A = np.sum(wI1I2regions_A, axis=0)
+        regionws_A = lw_regions(test_bolo, test_anopts); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_A
+        wI1I2nom_A = lw - (w2w_tot + w2w_e)
+        dI1I2eff_A = deff_I1I2(fit, regionws_A, wI1I2nom_A, dI1I2_test, dI10, dW10, legA=True, left_frac=left_frac)
 
         # leg D
-        regionws_D = lw_regions(test_bolo, test_anopts, delta_lw=deltalw_CD)
-        wI1I2regions_D, dI1I22walls_D, dI1I21wall_D, dI1I20walls_D = wI1I2s_deff(regionws_D, [dI10*np.ones_like(dI1I2_test), dI1I2_test], [dW10*np.ones_like(dI1I2_test), dW20*np.ones_like(dI1I2_test)], left_frac=left_frac, legD=True)
-        dI1I2eff_D  = np.array([deff(fit, wI1I2regions_D, dI1I22walls_D[:,dd], d_1wall=dI1I21wall_D[:,dd], d_0walls=dI1I20walls_D[:,dd]) for dd in np.arange(len(dI1I2_test))])
-        wI1I2tots_D = np.sum(wI1I2regions_D, axis=0)
+        regionws_D = lw_regions(test_bolo, test_anopts, delta_lw=deltalw_CD); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_D
+        wI1I2nom_D = lw - (w1w_s + w1w_e)
+        dI1I2eff_D = deff_I1I2(fit, regionws_D, wI1I2nom_D, dI1I2_test, dI10, dW10, legD=True, left_frac=left_frac)
 
         # leg C
-        deltaw2w_C = test_bolo['geometry']['w1w'] - test_bolo['geometry']['w2w']
-        regionws_C = lw_regions(test_bolo, test_anopts, delta_w2w=deltaw2w_C, delta_lw=deltalw_CD)
-        wI1I2regions_C, dI1I22walls_C, dI1I21wall_C, dI1I20walls_C = wI1I2s_deff(regionws_C, [dI10*np.ones_like(dI1I2_test), dI1I2_test], [dW10*np.ones_like(dI1I2_test), dW20*np.ones_like(dI1I2_test)], left_frac=left_frac, legC=True)
-        dI1I2eff_C = np.array([deff(fit, wI1I2regions_C, dI1I22walls_C[:,dd], d_1wall=dI1I21wall_C[:,dd], d_0walls=dI1I20walls_C[:,dd]) for dd in np.arange(len(dI1I2_test))])
-        wI1I2tots_C = np.sum(wI1I2regions_C, axis=0)
+        regionws_C = lw_regions(test_bolo, test_anopts, delta_lw=deltalw_CD); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_C
+        wI1I2nom_C = lw - (w2w_e + w2w_tot)
+        dI1I2eff_C = deff_I1I2(fit, regionws_C, wI1I2nom_C, dI1I2_test, dI10, dW10, legC=True, left_frac=left_frac)
 
         plt.figure()
         plt.plot(dI1I2_test*1E3, dI1I2eff_A/dI1I2_test*100, label='leg A')
         plt.plot(dI1I2_test*1E3, dI1I2eff_C/dI1I2_test*100, label='leg C')
         plt.plot(dI1I2_test*1E3, dI1I2eff_D/dI1I2_test*100, label='leg D')
         plt.ylabel('dI1I2_eff [\% of dI1I2]')
-        # plt.plot(dI1I2_test*1E3, dI1I2eff_A*1E3, label='leg A')
-        # plt.plot(dI1I2_test*1E3, dI1I2eff_C*1E3, label='leg C')
-        # plt.plot(dI1I2_test*1E3, dI1I2eff_D*1E3, label='leg D')
-        # plt.ylabel('dI1I2_eff [nm]')
-        # plt.plot([min(dI1I2_test)*1E3, max(dI1I2_test)*1E3], [min(dI1I2_test)*1E3, max(dI1I2_test)*1E3], 'k--')
         plt.xlabel('dI1I2 [nm]')
         plt.xlim(min(dI1I2_test)*1E3, max(dI1I2_test)*1E3)
         plt.legend()
         plt.grid(linestyle = '--', which='both', linewidth=0.5)
 
+        dI1I20 = 0.600
+        lw_test = np.linspace(w1w, 7.0)
+        test_bolo, test_anopts = test_objs(stack_I=True, dW1=dW10, dW2=dW20, dI1=dI10, dI2=dI20, lw=lw_test)
 
+        # leg A
+        regionws_A = lw_regions(test_bolo, test_anopts); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_A
+        wI1I2nom_A = lw - (w2w_tot + w2w_e)
+        dI1I2eff_A = deff_I1I2(fit, regionws_A, wI1I2nom_A, dI1I20, dI10, dW10, legA=True, left_frac=left_frac)
 
+        # leg D
+        regionws_D = lw_regions(test_bolo, test_anopts, delta_lw=deltalw_CD); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_D
+        wI1I2nom_D = lw - (w1w_s + w1w_e)
+        dI1I2eff_D = deff_I1I2(fit, regionws_D, wI1I2nom_D, dI1I20, dI10, dW10, legD=True, left_frac=left_frac)
+
+        # leg C
+        regionws_C = lw_regions(test_bolo, test_anopts, delta_lw=deltalw_CD); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_C
+        wI1I2nom_C = lw - (w2w_e + w2w_tot)
+        dI1I2eff_C = deff_I1I2(fit, regionws_C, wI1I2nom_C, dI1I20, dI10, dW10, legC=True, left_frac=left_frac)
+
+        plt.figure()
+        plt.plot(lw_test, dI1I2eff_A/dI1I20*100, label='leg A')
+        plt.plot(lw_test, dI1I2eff_C/dI1I20*100, label='leg C')
+        plt.plot(lw_test, dI1I2eff_D/dI1I20*100, label='leg D')
+        plt.ylabel('dI1I2_eff [\% of dI1I2]')
+        plt.xlabel('lw [um]')
+        plt.xlim(min(lw_test), max(lw_test))
+        plt.legend()
+        plt.grid(linestyle = '--', which='both', linewidth=0.5)
 
     return
