@@ -610,9 +610,6 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False):
 
         dI2_eff  = np.array([deff(fit, w2w, dI) for dI in dI2_test])
         plt.figure()
-        # plt.plot(dI2_test*1E3, dI2_eff*1E3)
-        # plt.plot([min(dI2_test)*1E3, max(dI2_test)*1E3], [min(dI2_test)*1E3, max(dI2_test)*1E3], 'k--')
-        # plt.ylabel('dI2_eff [nm]')
         plt.plot(dI2_test*1E3, dI2_eff/dI2_test*100)
         plt.xlabel('dI2 [nm]')
         plt.ylabel('dI2_eff [\% of dI2]')
