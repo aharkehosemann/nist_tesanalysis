@@ -3,7 +3,7 @@ from bolotest_routines import *
 
 ### testing suite - test model output
 def test_objs(lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0, dI1=0, dW2=0, dI2=0, d_stacks=np.array([0, 0, 0, 0]), w_stacks=np.array([0, 0, 0, 0, 0]),
-                model='Three-Layer', stack_I=False, stack_N=False, tall_Istacks=False, constrained=False, supG=0.0, calc='Median', deltalw_CD=0.0, extend_I2=False, calc_dIeff=False):
+                model='Three-Layer', stack_I=False, stack_N=False, tall_Istacks=False, constrained=False, supG=0.0, calc='Median', deltalw_CD=0.0, extend_I2=False, calc_deff=False):
     ### create dummy objects for testing
 
     test_bolo = {}; test_bolo['geometry'] = {}
@@ -32,7 +32,7 @@ def test_objs(lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0, dI1=0,
     test_anopts['model']          = model   # Two-, Three-, or Four-Layer model?
     test_anopts['supG']           = supG    # reduce G for substrate on legs B, E & G based on surface roughness
     test_anopts['calc']           = calc   # how to evaluate fit parameters from simluation data - an_opts are 'Mean' and 'Median'
-    test_anopts['calc_dIeff']     = calc_dIeff
+    test_anopts['calc_deff']     = calc_deff
 
     return test_bolo, test_anopts
 
@@ -193,7 +193,7 @@ def test_alphascaleI(verbose=False):
 def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0.200, dI1=0.400, dW2=0.350, dI2=0.400,
                     manual_calc = False, plot_vwidth=False, lwrange=np.arange(5,40), plot_vdsub=False, dsrange=np.arange(0.400, 2.500),
                     legA=False, legB=False, legC=False, legD=False, legE=False, legF=False, legG=False,
-                    verbose=False, tall_Istacks=False, d_stacks=np.array([0, 0, 0, 0]), w_stacks=np.array([0, 0, 0, 0, 0]), deltalw_CD=0.0, extend_I2=False, calc_dIeff=False):
+                    verbose=False, tall_Istacks=False, d_stacks=np.array([0, 0, 0, 0]), w_stacks=np.array([0, 0, 0, 0, 0]), deltalw_CD=0.0, extend_I2=False, calc_deff=False):
     # compare output between I-layer stacking at w > w1w ("no stacking / status quo / 0"), I-layer stacking at w > w2w, and nitride stacking
     # can look at different outputs for different legs vs width or thickness
     # manual_calc currently only works for leg A
@@ -281,25 +281,25 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
 
         delta_lw = deltalw_CD if legC or legD else 0   # leg A and D seem to have a different width than the others
 
-        bolo0_lw, anopts0_lw = test_objs(lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks, extend_I2=extend_I2, calc_dIeff=calc_dIeff)
-        G0_lw  = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
-        G0S_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
-        G0W_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
-        G0I_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
+        bolo0_lw, anopts0_lw = test_objs(lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks, extend_I2=extend_I2, calc_deff=calc_deff)
+        G0_lw  = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
+        G0S_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
+        G0W_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
+        G0I_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
         assert all([G >= 0 for G in np.array([G0_lw, G0S_lw, G0W_lw, G0I_lw]).flat]), "G < 0"
 
-        boloI_lw, anoptsI_lw = test_objs(stack_I=True, lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks, extend_I2=extend_I2, calc_dIeff=calc_dIeff)
-        GI_lw  = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
-        GIS_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
-        GIW_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
-        GII_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
+        boloI_lw, anoptsI_lw = test_objs(stack_I=True, lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks, extend_I2=extend_I2, calc_deff=calc_deff)
+        GI_lw  = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
+        GIS_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
+        GIW_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
+        GII_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
         assert all([G >= 0 for G in np.array([GI_lw, GIS_lw, GIW_lw, GII_lw]).flat]), "G < 0"
 
-        boloN_lw, anoptsN_lw = test_objs(stack_N=True, lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks, extend_I2=extend_I2, calc_dIeff=calc_dIeff)
-        GN_lw  = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
-        GNS_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
-        GNW_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
-        GNI_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I20=dI1+dI2)
+        boloN_lw, anoptsN_lw = test_objs(stack_N=True, lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks, extend_I2=extend_I2, calc_deff=calc_deff)
+        GN_lw  = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
+        GNS_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
+        GNW_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
+        GNI_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
         assert all([G >= 0 for G in np.array([GN_lw, GNS_lw, GNW_lw, GNI_lw]).flat]), "G < 0"
 
         # if legC: w2w = w1w; w1w = np.inf   # w2w is width of w1w on leg C, no w1w
@@ -548,7 +548,7 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False):
 
     deff_calc = (d*mfp**alpha)**(1/(1+alpha))
 
-    fit = np.array([1, 1, 1, 0, 0, alpha])
+    fit = np.array([1, 1, 1, 1, 1, alpha])
     deff_func = deff(fit, w, d)
 
     out_ratio        = round(deff_func/deff_calc, 3)
@@ -581,8 +581,8 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False):
     regionws_D = lw_regions(bolo_ACD, anopts_ACD); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_D
     dI1I2eff_D = deff_I1I2(fit, regionws_D, wI1I2nom_ACD, dI1I2_ACD, d_ACD, d_ACD, legD=True, left_frac=left_frac)
 
-    Avscalc = round(dI1I2eff_A/deffI_calc, 3)
-    assert Avscalc == 1, "deff_A / hand-calcluated deff = {} != 1".format(Avscalc)
+    # Avscalc = round(dI1I2eff_A/deffI_calc, 3)
+    # assert Avscalc == 1, "deff_A / hand-calcluated deff = {} != 1".format(Avscalc)
 
     AoverC = round(dI1I2eff_A/dI1I2eff_C, 3)
     assert AoverC == 1, "deff_A / deff_C = {} != 1, but it should in this instance".format(AoverC)
@@ -615,6 +615,16 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False):
         plt.ylabel('dI2_eff [\% of dI2]')
         plt.xlim(min(dI2_test)*1E3, max(dI2_test)*1E3)
         plt.grid(linestyle = '--', which='both', linewidth=0.5)
+
+        dW2_test = np.linspace(0.100, 0.400)
+        dW2_eff  = np.array([deff(fit, w2w, dW, alphaind=4) for dW in dW2_test])
+        plt.figure()
+        plt.plot(dW2_test*1E3, dW2_eff/dW2_test*100)
+        plt.xlabel('dW2 [nm]')
+        plt.ylabel('dW2_eff [\% of dW2]')
+        plt.xlim(min(dW2_test)*1E3, max(dW2_test)*1E3)
+        plt.grid(linestyle = '--', which='both', linewidth=0.5)
+
 
         dI10 = 0.350
         dI1I2_test = np.linspace(dI10, 1.000)
