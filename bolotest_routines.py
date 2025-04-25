@@ -466,7 +466,6 @@ def layer_widths(an_opts, bolo, region_ws,
             else:
                 wI1I2_nom     = lw - (w2w_tot + w2w_e)
                 wI1I2_tallw2  = w2w_e
-                wI1I2_tallw1  = 0
 
                 wSI1I2_nom    = 0
                 wSI1I2_tallw2 = 0
@@ -482,7 +481,6 @@ def layer_widths(an_opts, bolo, region_ws,
 
                 wI1I2_nom     = 0
                 wI1I2_tallw2  = 0
-                wI1I2_tallw1  = 0
 
                 wSI1I2_nom    = lw - (w2w_tot + w2w_e)
                 wSI1I2_tallw2 = w2w_e
@@ -490,7 +488,6 @@ def layer_widths(an_opts, bolo, region_ws,
             else:
                 wI1I2_nom     = lw - (w2w_tot + w2w_e)
                 wI1I2_tallw2  = w2w_e
-                wI1I2_tallw1  = 0
 
                 wSI1I2_nom    = 0
                 wSI1I2_tallw2 = 0
@@ -508,9 +505,8 @@ def layer_widths(an_opts, bolo, region_ws,
                 wI1I2_nom  = lw - w2w_tot
                 wSI1I2_nom = 0
 
-            wI1I2_tallw2 = 0; wI1I2_tallw1 = 0
-            wSI1I2_tallw2 = 0; wSI1I2_tallw1 = 0
-
+            wI1I2_tallw2 = 0; wSI1I2_tallw2 = 0
+        wI1I2_tallw1 = 0; wSI1I2_tallw1 = 0
     elif legD:   # S-W1-I1-I2
         # I1-I2 stacked across entire leg, nominal height includes W2 edge and slope
         if tall_Istacks:
@@ -549,7 +545,6 @@ def layer_widths(an_opts, bolo, region_ws,
         wI1_nom    = 0.; wI2_nom = 0.   # I1I2 stack over entire leg - no individual I layers
         wI2_tallw2 = 0.; wI2_tallw1 = 0.
 
-
     elif legE:   # S-W1-W2
         # leg E S is split up into sections
         wSiNx_nom = 0;   wI1_nom = 0.
@@ -584,12 +579,10 @@ def layer_widths(an_opts, bolo, region_ws,
 def mfpb(w, d, walls=2):   # calculate effective thickness for width-restricted I layers
 
     # handle divide by 0 errors
-    # if (np.isscalar(d) and d==0): d = 1E-12
-    # if (np.isscalar(w) and w==0): w= 1E-12
     if np.isscalar(w) or not w.shape:
         if w==0: w= 1E-12
     else:
-        wI[w==0] = 1E-12
+        w[w==0] = 1E-12
     if np.isscalar(d) or not d.shape:
         if d==0: d = 1E-12
     else:
@@ -624,17 +617,6 @@ def deff(fit, w, d, walls=2, dI1I2=None, alphaind=5):   # calculate effective th
     mfp_b  = mfpb(w, dI1I2, walls=walls) if dI1I2 else mfpb(w, d, walls=walls)  # calculate boundary-scattering mfp
     assert np.all(mfp_b>=0), 'd or mfp of subregion is negative'
 
-    # warnings.simplefilter('always', RuntimeWarning)
-
-    # with warnings.catch_warnings():
-    #     try:
-    #         d_eff = ( d * mfp_b**alpha )**(1/(1+alpha))
-    #         assert np.all(d_eff>=0), 'd or mfp of subregion is negative or nan'
-    #         return d_eff
-    #     except RuntimeWarning as e:
-    #         print("Caught warning as exception: {}".format(e))
-    #         import pdb; pdb.set_trace()
-    #         print('')
     d_eff = ( d * mfp_b**alpha )**(1/(1+alpha))
     assert np.all(d_eff>=0), 'd or mfp of subregion is negative or nan'
     return d_eff
@@ -644,14 +626,17 @@ def deff_simple(d, mfp_b, alpha=1.):
     assert np.all(mfp_b>=0), 'd or mfp of subregion is negative'
 
     if np.isscalar(d) or not d.shape:
-        if d==0:    d    = 1E-12
+        if d==0: d = 1E-12
+    else:
+        d[d==0] = 1E-12
+
+    if np.isscalar(mfp_b) or not mfp_b.shape:
         if mfp_b==0: mfp_b = 1E-12
     else:
-        d[d==0]       = 1E-12
         mfp_b[mfp_b==0] = 1E-12
-    if alpha==1: alpha = 1+1E-12
 
-    assert np.all(np.array([d, mfp_b])>=0), 'd or mfp of subregion is negative'
+    assert (np.all(d>=0) and np.all(mfp_b>=0)), 'd or mfp of subregion is negative'
+    if alpha==1: alpha = 1+1E-12
 
     d_eff = ( d * mfp_b**alpha )**(1/(1+alpha))
     assert np.all(d_eff>=0), 'd or mfp of subregion is negative or nan'
@@ -671,39 +656,51 @@ def deff_I1I2(fit, region_ws, wI1I2_nom, dI1I20, dI10, dW1, legA=False, legC=Fal
     if legA:
 
         d_a  = (dI1I20 - dI10); numwalls_a = 2   # 2 walls
-        d_b  = dI10;            numwalls_b = 0   # 0 walls
+        d_b  = dI10*np.ones_like(dI1I20);            numwalls_b = 0   # 0 walls
         d_c  = (dI1I20 - dW1);  numwalls_c = 1   # 1 wall
-        d_d  = dW1;             numwalls_d = 2   # 2 walls
+        d_d  = dW1*np.ones_like(dI1I20);             numwalls_d = 2   # 2 walls
 
         wI1I2_ab = (w1w_ns - (w2w_tot + w2w_e) + deltawI1I2_A)
         leftwfrac_ab = 0.5
+        rightwfrac_ab = 0.5
 
     elif legC:
 
-        d_a  = 1E-12*np.ones_like(dI1I20); numwalls_a = 0   # region doesn't exist on C
-        d_b  = 1E-12*np.ones_like(dI1I20); numwalls_b = 0   # region doesn't exist on C
-        d_c  = (dI1I20 - dI10);            numwalls_c = 2   # 2 walls
-        d_d  = dI10;                       numwalls_d = 1   # 1 wall
+        # d_a  = 1E-12*np.ones_like(dI1I20); numwalls_a = 0   # region doesn't exist on C
+        # d_b  = 1E-12*np.ones_like(dI1I20); numwalls_b = 0   # region doesn't exist on C
+        d_a  = np.zeros_like(dI1I20); numwalls_a = 0   # region doesn't exist on C
+        d_b  = np.zeros_like(dI1I20); numwalls_b = 0   # region doesn't exist on C
+        d_c  = (dI1I20 - dI10);       numwalls_c = 2   # 2 walls
+        d_d  = dI10*np.ones_like(dI1I20); numwalls_d = 1   # 1 wall
 
-        wI1I2_ab     = 1E-12*np.ones_like(lw)
-        leftwfrac_ab = 1E-12
+        # wI1I2_ab     = 1E-12*np.ones_like(lw)
+        wI1I2_ab     = np.zeros_like(lw)
+        # leftwfrac_ab = 1E-12
+        # rightwfrac_ab = 1E-12
+        leftwfrac_ab = 0
+        rightwfrac_ab = 0
 
     elif legD:   # no section 4, treat I1I2 on W1 as single region 3 layer
 
-        d_a  = dW1;            numwalls_a = 2   # 2 walls
+        d_a  = dW1*np.ones_like(dI1I20);            numwalls_a = 2   # 2 walls
         d_b  = (dI1I20 - dW1); numwalls_b = 0   # 0 walls
         d_c  = (dI1I20 - dW1); numwalls_c = 1   # 1 wall
-        d_d  = dW1;            numwalls_d = 2   # 2 walls
+        d_d  = dW1*np.ones_like(dI1I20);            numwalls_d = 2   # 2 walls
 
         wI1I2_ab     = w1w_tot   # treat I1I2 on top of W1 as single double-walled layer
-        leftwfrac_ab = 1 - 1E-12   # single layer of I1I2 with 2 walls - theoretically same as two single-wall layers
+        # leftwfrac_ab = 1 - 1E-12   # single layer of I1I2 with 2 walls - theoretically same as two single-wall layers
+        # rightwfrac_ab = 1E-12   # single layer of I1I2 with 2 walls - theoretically same as two single-wall layers
+        leftwfrac_ab = 1   # single layer of I1I2 with 2 walls - theoretically same as two single-wall layers
+        rightwfrac_ab = 0   # single layer of I1I2 with 2 walls - theoretically same as two single-wall layers
 
     assert np.all(np.array([d_a, d_b, d_c, d_d])>=0), 'd of I1I2 subregion is negative'
     ''
     wI1I2ab_left  = wI1I2_ab * leftwfrac_ab
-    wI1I2ab_right = wI1I2_ab * (1-leftwfrac_ab)
+    # wI1I2ab_right = wI1I2_ab * (1-leftwfrac_ab)
+    wI1I2ab_right = wI1I2_ab * rightwfrac_ab
 
-    wI1I2_cd      = wI1I2_nom - wI1I2ab_left - wI1I2ab_right
+    # wI1I2_cd      = wI1I2_nom - wI1I2ab_left - wI1I2ab_right
+    wI1I2_cd      = wI1I2_nom - wI1I2_ab
     wI1I2cd_left  = wI1I2_cd * leftwfrac_cd
     wI1I2cd_right = wI1I2_cd * (1-leftwfrac_cd)
 
@@ -722,13 +719,13 @@ def deff_I1I2(fit, region_ws, wI1I2_nom, dI1I20, dI10, dW1, legA=False, legC=Fal
     mfpab_right  = mfpb(wI1I2ab_right, dI1I20, walls=numwalls_a)*d_a/dI1I20 + mfpb(wI1I2ab_right, dI1I20, walls=numwalls_b)*d_b/dI1I20
     mfpcd_left   = mfpb(wI1I2cd_left,  dI1I20, walls=numwalls_c)*d_c/dI1I20 + mfpb(wI1I2cd_left,  dI1I20, walls=numwalls_d)*d_d/dI1I20
     mfpcd_right  = mfpb(wI1I2cd_right, dI1I20, walls=numwalls_c)*d_c/dI1I20 + mfpb(wI1I2cd_right, dI1I20, walls=numwalls_d)*d_d/dI1I20
-    assert np.all(mfpab_left>0) and np.all(mfpab_right>0) and np.all(mfpcd_left>0) and np.all(mfpcd_right>0), 'mfp is not positive'
+    assert np.all(mfpab_left>=0) and np.all(mfpab_right>=0) and np.all(mfpcd_left>=0) and np.all(mfpcd_right>0), 'mfp is not positive'
 
     deffab_left  = deff_simple(dI1I20, mfpab_left,  alpha=fit[5])
     deffab_right = deff_simple(dI1I20, mfpab_right, alpha=fit[5])
     deffcd_left  = deff_simple(dI1I20, mfpcd_left,  alpha=fit[5])
     deffcd_right = deff_simple(dI1I20, mfpcd_right, alpha=fit[5])
-    assert np.all(np.array([deffab_left, deffab_right, deffcd_left, deffcd_right])>=0), 'd or mfp of I1I2 subregion is negative or nan'
+    assert np.all(deffab_left>=0) and np.all(deffab_right>=0) and np.all(deffcd_left>=0) and np.all(deffcd_right>0), 'd is not positive or nan'
 
     wprodsum = wI1I2ab_left*deffab_left + wI1I2ab_right*deffab_right + wI1I2cd_left*deffcd_left + wI1I2cd_right*deffcd_right
     wsum     = wI1I2ab_left             + wI1I2ab_right              + wI1I2cd_left             + wI1I2cd_right
@@ -766,15 +763,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
     deltadI1I2_A = bolo['geometry'].get('deltadI1I2_A', 0.0)
     deltadI1I2_F = bolo['geometry'].get('deltadI1I2_F', 0.0)
 
-    # scale with L and d in diffuse / ballistic transition
-    if bolo['geometry'].get('acoustic_Lscale'):   # use acoustic scaling
-        a_factor = acoust_factor(bolo)
-    else:   # use power law length scaling
-        pLscale  = copy.copy(bolo['geometry']['pLscale']); ll = bolo['geometry'].get('ll')
-        a_factor = (220/ll)**pLscale
-
-    ### leg-specific geometry adjustments
-
+    ### leg-specific geometry
     delta_w2w = (bolo['geometry']['w1w'] - bolo['geometry']['w2w'] + deltaw2w_C) if legC else 0
 
     if legA:
@@ -793,36 +782,32 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
         dI1I2 = dI1 + dI2
         delta_lw = 0
 
+    ### general geometry
+    # scale with L and d in diffuse / ballistic transition
+    if bolo['geometry'].get('acoustic_Lscale'):   # use acoustic scaling
+        a_factor = acoust_factor(bolo)
+    else:   # use power law length scaling
+        pLscale  = copy.copy(bolo['geometry']['pLscale']); ll = bolo['geometry'].get('ll')
+        a_factor = (220/ll)**pLscale
+
     # layer thicknesses and widths
     [deltad_AW2, deltad_AW1, deltad_CW2, deltad_DW1] = bolo['geometry']['d_stacks'] if 'd_stacks' in bolo['geometry'] else [0, 0, 0, 0]
     region_ws = lw_regions(bolo, an_opts, delta_lw=delta_lw, delta_w2w=delta_w2w)
     lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = region_ws
 
+    if stack_N:   # separate SiOx and SiNx layers for nitride stacking treatment
+        dOx   = bolo['geometry']['dSiOx']*np.ones_like(dS)   # nm - thickness of oxide layer - shared with all film stacks
+        dSiNx = dS-dOx
 
-    # separate SiOx and SiNx layers for nitride stacking treatment (stack_N=True)
-    dOx   = bolo['geometry']['dSiOx']*np.ones_like(dS)   # nm - thickness of oxide layer - shared with all film stacks
-    dSiNx = dS-dOx
-    # if legE:
-    #     dSiNxE_W1 = dSE_W1-dOx; dSiNxE_b = dSE_b-dOx
-    # else:
-    #     dSiNxE_W1 = dOx-dOx; dSiNxE_b = dOx-dOx
-
-    # handle dsub < d_SiNx
-    if np.isscalar(dSiNx):
-        if (dSiNx < 0):
-            dOx   = dS
-            dSiNx = 0
-        # elif (dSiNxE_W1 < 0):
-        #     dSiNxE_W1 = 0; dSiNxE_b = 0
-        # elif (dSiNxE_b < 0):
-        #     dSiNxE_b = 0
+        # handle dsub < d_SiNx
+        if np.isscalar(dSiNx):
+            if dSiNx<0: dOx = dS; dSiNx = 0
+        else:
+            dOx[dSiNx < 0]   = dS[dSiNx < 0]
+            dSiNx[dSiNx < 0] = 0
+        d_sub = dOx
     else:
-        dOx[dSiNx < 0]   = dS[dSiNx < 0]
-        dSiNx[dSiNx < 0] = 0
-        # if legE: dSiNxE_W1[dSiNxE_W1 < 0] = 0; dSiNxE_b[dSiNxE_b < 0] = 0   # three nitride regions to define
-
-    d_sub = dOx   if stack_N else dS
-    dSiNx = dSiNx if stack_N else np.zeros_like(dSiNx)
+        d_sub = dS; dSiNx = np.zeros_like(dS)
 
     if calc_deff:  # calculate effective width including side-wall scattering
         dsub0 = d_sub
@@ -836,7 +821,7 @@ def G_leg(fit, an_opts, bolo, dS, dW1, dI1, dW2, dI2, include_S, include_W, incl
         dW2   = np.array([deff(fit[ff], w2w_tot, dW20,  alphaind=4) for ff in np.arange(len(fit))]) if len(fit.shape)>1 else deff(fit, w2w_tot, dW20, alphaind=4)
         assert (np.all(dW1>=0) and np.all(dW2>=0)), 'dW1 or dW2 is negative or nan'
 
-    if model=='Two-Layer':   # treat S and I layers the same
+    if model=='Two-Layer':   # treat S and I layers as the same
 
         if legA:   # S-W1-I1-W2-I2
             # I1-I2 stack beyond W2 width, SiNx-I1-I2 stack beyond W1 width

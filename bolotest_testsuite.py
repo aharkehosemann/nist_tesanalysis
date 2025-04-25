@@ -574,7 +574,6 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False):
     # leg C
     deltaw2w_C = bolo_ACD['geometry']['w1w'] - bolo_ACD['geometry']['w2w']
     regionws_C = lw_regions(bolo_ACD, anopts_ACD, delta_w2w=deltaw2w_C); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_C
-    # wI1I2nom_C = lw - (w2w_tot + w2w_e)
     dI1I2eff_C = deff_I1I2(fit, regionws_C, wI1I2nom_ACD, dI1I2_ACD, d_ACD, d_ACD, legC=True, left_frac=left_frac)
 
     # leg D
@@ -590,18 +589,12 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False):
     AoverD = round(dI1I2eff_A/dI1I2eff_D, 3)
     assert AoverD == 1, "deff_A / deff_D = {} != 1, but it should in this instance".format(AoverD)
 
-
     if plot_deff:
         dW10 = 0.160; dW20 = 0.350
         dI10 = 0.350; dI20 = 0.300
         lw0  = 6.0
 
         test_bolo, test_anopts = test_objs(stack_I=True, dW1=dW10, dW2=dW20, dI1=dI10, dI2=dI20, lw=lw0)
-
-        dW10 = test_bolo['geometry']['dW1']
-        dW20 = test_bolo['geometry']['dW2']
-        dI10 = test_bolo['geometry']['dI1']
-        dI20 = test_bolo['geometry']['dI2']
 
         deltalw_CD = test_bolo['geometry']['deltalw_CD']
 
@@ -625,8 +618,7 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False):
         plt.xlim(min(dW2_test)*1E3, max(dW2_test)*1E3)
         plt.grid(linestyle = '--', which='both', linewidth=0.5)
 
-
-        dI10 = 0.350
+        # plot dI1I2_eff
         dI1I2_test = np.linspace(dI10, 1.000)
 
         # leg A
