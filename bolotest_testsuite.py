@@ -539,7 +539,6 @@ def test_widths(dsub=0.380, dSiOx=0.120, lw=7, w1w=6, w2w=4, dI1=0.5, dI2=0.6, s
 
     return
 
-
 def test_deff(alpha=1, left_frac=1., plot_deff=False):
 
     d   = 1
