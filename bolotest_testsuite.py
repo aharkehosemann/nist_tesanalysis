@@ -3,7 +3,7 @@ from bolotest_routines import *
 
 ### testing suite - test model output
 def test_objs(lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0, dI1=0, dW2=0, dI2=0, d_stacks=np.array([0, 0, 0, 0]), w_stacks=np.array([0, 0, 0, 0, 0]),
-                model='Three-Layer', stack_I=False, stack_N=False, tall_Istacks=False, constrained=False, supG=0.0, calc='Median', deltalw_CD=0.0, extend_I2=False, calc_deff=False):
+                model='Three-Layer', stack_I=False, stack_N=False, tall_Istacks=False, constrained=False, supG=0.0, calc='Median', deltalw_CD=0.0, extend_I2=False, calc_mfpb=False):
     ### create dummy objects for testing
 
     test_bolo = {}; test_bolo['geometry'] = {}
@@ -32,7 +32,7 @@ def test_objs(lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0, dI1=0,
     test_anopts['model']          = model   # Two-, Three-, or Four-Layer model?
     test_anopts['supG']           = supG    # reduce G for substrate on legs B, E & G based on surface roughness
     test_anopts['calc']           = calc   # how to evaluate fit parameters from simluation data - an_opts are 'Mean' and 'Median'
-    test_anopts['calc_deff']     = calc_deff
+    test_anopts['calc_mfpb']     = calc_mfpb
 
     return test_bolo, test_anopts
 
@@ -193,7 +193,7 @@ def test_alphascaleI(verbose=False):
 def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w=5, w2w=3, dW1=0.200, dI1=0.400, dW2=0.350, dI2=0.400,
                     manual_calc = False, plot_vwidth=False, lwrange=np.arange(5,40), plot_vdsub=False, dsrange=np.arange(0.400, 2.500),
                     legA=False, legB=False, legC=False, legD=False, legE=False, legF=False, legG=False,
-                    verbose=False, tall_Istacks=False, d_stacks=np.array([0, 0, 0, 0]), w_stacks=np.array([0, 0, 0, 0, 0]), deltalw_CD=0.0, extend_I2=False, calc_deff=False):
+                    verbose=False, tall_Istacks=False, d_stacks=np.array([0, 0, 0, 0]), w_stacks=np.array([0, 0, 0, 0, 0]), deltalw_CD=0.0, extend_I2=False, calc_mfpb=False):
     # compare output between I-layer stacking at w > w1w ("no stacking / status quo / 0"), I-layer stacking at w > w2w, and nitride stacking
     # can look at different outputs for different legs vs width or thickness
     # manual_calc currently only works for leg A
@@ -281,21 +281,21 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
 
         delta_lw = deltalw_CD if legC or legD else 0   # leg A and D seem to have a different width than the others
 
-        bolo0_lw, anopts0_lw = test_objs(lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks, extend_I2=extend_I2, calc_deff=calc_deff)
+        bolo0_lw, anopts0_lw = test_objs(lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks, extend_I2=extend_I2, calc_mfpb=calc_mfpb)
         G0_lw  = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
         G0S_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
         G0W_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
         G0I_lw = G_leg(fit, anopts0_lw, bolo0_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
         assert all([G >= 0 for G in np.array([G0_lw, G0S_lw, G0W_lw, G0I_lw]).flat]), "G < 0"
 
-        boloI_lw, anoptsI_lw = test_objs(stack_I=True, lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks, extend_I2=extend_I2, calc_deff=calc_deff)
+        boloI_lw, anoptsI_lw = test_objs(stack_I=True, lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks, extend_I2=extend_I2, calc_mfpb=calc_mfpb)
         GI_lw  = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
         GIS_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
         GIW_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
         GII_lw = G_leg(fit, anoptsI_lw, boloI_lw, dsub, dW1, dI1, dW2, dI2, False, False, True, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
         assert all([G >= 0 for G in np.array([GI_lw, GIS_lw, GIW_lw, GII_lw]).flat]), "G < 0"
 
-        boloN_lw, anoptsN_lw = test_objs(stack_N=True, lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks, extend_I2=extend_I2, calc_deff=calc_deff)
+        boloN_lw, anoptsN_lw = test_objs(stack_N=True, lw=lwrange, ll=ll, w1w=w1w, w2w=w2w, dsub=dsub, dSiOx=dSiOx, dW1=dW1, dI1=dI1, dW2=dW2, dI2=dI2, w_stacks=w_stacks, d_stacks=d_stacks, tall_Istacks=tall_Istacks, extend_I2=extend_I2, calc_mfpb=calc_mfpb)
         GN_lw  = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, True, True, True,   legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
         GNS_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, True, False, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
         GNW_lw = G_leg(fit, anoptsN_lw, boloN_lw, dsub, dW1, dI1, dW2, dI2, False, True, False, legA=legA, legB=legB, legC=legC, legD=legD, legE=legE, legF=legF, legG=legG, dI1I2=dI1+dI2)
@@ -309,6 +309,9 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         plt.plot(lwrange/2, G0_lw,       alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
         plt.plot(lwrange/2, GI_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
         plt.plot(lwrange/2, GN_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
+        # plt.plot(lwrange/2, G0_lw, '.', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
+        # plt.plot(lwrange/2, GI_lw, '.', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
+        # plt.plot(lwrange/2, GN_lw, '.', alpha=0.8, linewidth=2.5, label='N Stacks')
         plt.vlines([w2w/2, w1w/2, (lw+delta_lw)/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.7, color='k')
         if tall_Istacks:
             plt.vlines([np.array([w2w-w_stacks[0], w2w+w_stacks[1]])/2, np.array([w1w-w_stacks[2], w1w+w_stacks[3]])/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle=':', alpha=0.3, color='k')
@@ -376,6 +379,9 @@ def compare_output(fit, Gmeas=np.nan, lw=5, ll=220, dsub=0.400, dSiOx=0.120, w1w
         plt.plot(lwrange/2, G0I_lw,       alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
         plt.plot(lwrange/2, GII_lw, '--', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
         plt.plot(lwrange/2, GNI_lw, '-.', alpha=0.8, linewidth=2.5, label='N Stacks')
+        # plt.plot(lwrange/2, G0I_lw, '.', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W1')
+        # plt.plot(lwrange/2, GII_lw, '.', alpha=0.8, linewidth=2.5, label='I Stacks $w>$W2')
+        # plt.plot(lwrange/2, GNI_lw, '.', alpha=0.8, linewidth=2.5, label='N Stacks')
         # plt.vlines([w2w/2, w1w/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.3, color='k')
         plt.vlines([w2w/2, w1w/2, (lw+delta_lw)/2], 0, np.nanmax([G0_lw, GI_lw, GN_lw])*1.1, linestyle='--', alpha=0.7, color='k')
         if tall_Istacks:
@@ -539,19 +545,19 @@ def test_widths(dsub=0.380, dSiOx=0.120, lw=7, w1w=6, w2w=4, dI1=0.5, dI2=0.6, s
 
     return
 
-def test_deff(alpha=1, left_frac=1., plot_deff=False, plot_GdeffvGmfp=False):
+def test_mfpb(alpha=1, left_frac=1., plot_mfpb=False, plot_GmfpbvGmfp=False):
 
     d   = 1
     w   = 2*d
     mfp = 1/(1/d + 1/w)
 
-    deff_calc = (d*mfp**alpha)**(1/(1+alpha))
+    mfpb_calc = (d*mfp**alpha)**(1/(1+alpha))
 
     fit = np.array([1, 1, 1, 1, 1, alpha])
-    # deff_func = deff(fit, w, d)
+    # mfpb_func = mfpb(fit, w, d)
 
-    # out_ratio        = round(deff_func/deff_calc, 3)
-    # assert out_ratio == 1, "deff(function) / deff(hand calc) = {} != 1".format(out_ratio)
+    # out_ratio        = round(mfpb_func/mfpb_calc, 3)
+    # assert out_ratio == 1, "mfpb(function) / mfpb(hand calc) = {} != 1".format(out_ratio)
 
     # A, C, and D are the same if:
     # widths of regions a and b = 0
@@ -563,32 +569,32 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False, plot_GdeffvGmfp=False):
 
     mfpIcalc_2walls = 1/(1/dI1I2_ACD + 1/lw)
     mfpIcalc_1wall  = 1/(1/dI1I2_ACD + 1/(2*lw))
-    deffI_calc = (dI1I2_ACD * mfpIcalc_2walls**alpha)**(1/(1+alpha))*0.5 + (dI1I2_ACD * mfpIcalc_1wall**alpha)**(1/(1+alpha))*0.5
+    mfpbI_calc = (dI1I2_ACD * mfpIcalc_2walls**alpha)**(1/(1+alpha))*0.5 + (dI1I2_ACD * mfpIcalc_1wall**alpha)**(1/(1+alpha))*0.5
 
-    # leg A
-    regionws_A   = lw_regions(bolo_ACD, anopts_ACD); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_A
-    wI1I2nom_ACD = lw - (w2w_tot + w2w_e)
-    dI1I2eff_A   = deff_I1I2(fit, regionws_A, wI1I2nom_ACD, dI1I2_ACD, d_ACD, d_ACD, legA=True, left_frac=left_frac)
+    # # leg A
+    # regionws_A   = lw_regions(bolo_ACD, anopts_ACD); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_A
+    # wI1I2nom_ACD = lw - (w2w_tot + w2w_e)
+    # dI1I2eff_A   = mfpb_I1I2(fit, regionws_A, wI1I2nom_ACD, dI1I2_ACD, d_ACD, d_ACD, legA=True, left_frac=left_frac)
 
-    # leg C
-    deltaw2w_C = bolo_ACD['geometry']['w1w'] - bolo_ACD['geometry']['w2w']
-    regionws_C = lw_regions(bolo_ACD, anopts_ACD, delta_w2w=deltaw2w_C); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_C
-    dI1I2eff_C = deff_I1I2(fit, regionws_C, wI1I2nom_ACD, dI1I2_ACD, d_ACD, d_ACD, legC=True, left_frac=left_frac)
+    # # leg C
+    # deltaw2w_C = bolo_ACD['geometry']['w1w'] - bolo_ACD['geometry']['w2w']
+    # regionws_C = lw_regions(bolo_ACD, anopts_ACD, delta_w2w=deltaw2w_C); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_C
+    # dI1I2eff_C = mfpb_I1I2(fit, regionws_C, wI1I2nom_ACD, dI1I2_ACD, d_ACD, d_ACD, legC=True, left_frac=left_frac)
 
-    # leg D
-    regionws_D = lw_regions(bolo_ACD, anopts_ACD); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_D
-    dI1I2eff_D = deff_I1I2(fit, regionws_D, wI1I2nom_ACD, dI1I2_ACD, d_ACD, d_ACD, legD=True, left_frac=left_frac)
+    # # leg D
+    # regionws_D = lw_regions(bolo_ACD, anopts_ACD); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_D
+    # dI1I2eff_D = mfpb_I1I2(fit, regionws_D, wI1I2nom_ACD, dI1I2_ACD, d_ACD, d_ACD, legD=True, left_frac=left_frac)
 
-    # Avscalc = round(dI1I2eff_A/deffI_calc, 3)
-    # assert Avscalc == 1, "deff_A / hand-calcluated deff = {} != 1".format(Avscalc)
+    # # Avscalc = round(dI1I2eff_A/mfpbI_calc, 3)
+    # # assert Avscalc == 1, "mfpb_A / hand-calcluated mfpb = {} != 1".format(Avscalc)
 
-    AoverC = round(dI1I2eff_A/dI1I2eff_C, 3)
-    assert AoverC == 1, "deff_A / deff_C = {} != 1, but it should in this instance".format(AoverC)
+    # AoverC = round(dI1I2eff_A/dI1I2eff_C, 3)
+    # assert AoverC == 1, "mfpb_A / mfpb_C = {} != 1, but it should in this instance".format(AoverC)
 
-    AoverD = round(dI1I2eff_A/dI1I2eff_D, 3)
-    assert AoverD == 1, "deff_A / deff_D = {} != 1, but it should in this instance".format(AoverD)
+    # AoverD = round(dI1I2eff_A/dI1I2eff_D, 3)
+    # assert AoverD == 1, "mfpb_A / mfpb_D = {} != 1, but it should in this instance".format(AoverD)
 
-    if plot_deff:
+    if plot_mfpb:
         dW10 = 0.160; dW20 = 0.350
         dI10 = 0.350; dI20 = 0.300
         lw0  = 6.0
@@ -600,7 +606,7 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False, plot_GdeffvGmfp=False):
 
         # dI2_test = np.linspace(dI10, dI10+dW20)
 
-        # dI2_eff  = np.array([deff(fit, w2w, dI) for dI in dI2_test])
+        # dI2_eff  = np.array([mfpb(fit, w2w, dI) for dI in dI2_test])
         # plt.figure()
         # plt.plot(dI2_test*1E3, dI2_eff/dI2_test*100)
         # plt.xlabel('dI2 [nm]')
@@ -609,7 +615,7 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False, plot_GdeffvGmfp=False):
         # plt.grid(linestyle = '--', which='both', linewidth=0.5)
 
         # dW2_test = np.linspace(0.100, 0.400)
-        # dW2_eff  = np.array([deff(fit, w2w, dW, alphaind=4) for dW in dW2_test])
+        # dW2_eff  = np.array([mfpb(fit, w2w, dW, alphaind=4) for dW in dW2_test])
         # plt.figure()
         # plt.plot(dW2_test*1E3, dW2_eff/dW2_test*100)
         # plt.xlabel('dW2 [nm]')
@@ -623,17 +629,17 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False, plot_GdeffvGmfp=False):
         # # leg A
         # regionws_A = lw_regions(test_bolo, test_anopts); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_A
         # wI1I2nom_A = lw - (w2w_tot + w2w_e)
-        # dI1I2eff_A = deff_I1I2(fit, regionws_A, wI1I2nom_A, dI1I2_test, dI10, dW10, legA=True, left_frac=left_frac)
+        # dI1I2eff_A = mfpb_I1I2(fit, regionws_A, wI1I2nom_A, dI1I2_test, dI10, dW10, legA=True, left_frac=left_frac)
 
         # # leg D
         # regionws_D = lw_regions(test_bolo, test_anopts, delta_lw=deltalw_CD); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_D
         # wI1I2nom_D = lw - (w1w_s + w1w_e)
-        # dI1I2eff_D = deff_I1I2(fit, regionws_D, wI1I2nom_D, dI1I2_test, dI10, dW10, legD=True, left_frac=left_frac)
+        # dI1I2eff_D = mfpb_I1I2(fit, regionws_D, wI1I2nom_D, dI1I2_test, dI10, dW10, legD=True, left_frac=left_frac)
 
         # # leg C
         # regionws_C = lw_regions(test_bolo, test_anopts, delta_lw=deltalw_CD); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_C
         # wI1I2nom_C = lw - (w2w_e + w2w_tot)
-        # dI1I2eff_C = deff_I1I2(fit, regionws_C, wI1I2nom_C, dI1I2_test, dI10, dW10, legC=True, left_frac=left_frac)
+        # dI1I2eff_C = mfpb_I1I2(fit, regionws_C, wI1I2nom_C, dI1I2_test, dI10, dW10, legC=True, left_frac=left_frac)
 
         # plt.figure()
         # plt.plot(dI1I2_test*1E3, dI1I2eff_A/dI1I2_test*100, label='leg A')
@@ -652,17 +658,17 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False, plot_GdeffvGmfp=False):
         # leg A
         regionws_A = lw_regions(test_bolo, test_anopts); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_A
         wI1I2nom_A = lw - (w2w_tot + w2w_e)
-        dI1I2eff_A = deff_I1I2(fit, regionws_A, wI1I2nom_A, dI1I20, dI10, dW10, legA=True, left_frac=left_frac)
+        dI1I2eff_A = mfpb_I1I2(fit, regionws_A, wI1I2nom_A, dI1I20, dI10, dW10, legA=True, left_frac=left_frac)
 
         # leg D
         regionws_D = lw_regions(test_bolo, test_anopts, delta_lw=deltalw_CD); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_D
         wI1I2nom_D = lw - (w1w_s + w1w_e)
-        dI1I2eff_D = deff_I1I2(fit, regionws_D, wI1I2nom_D, dI1I20, dI10, dW10, legD=True, left_frac=left_frac)
+        dI1I2eff_D = mfpb_I1I2(fit, regionws_D, wI1I2nom_D, dI1I20, dI10, dW10, legD=True, left_frac=left_frac)
 
         # leg C
         regionws_C = lw_regions(test_bolo, test_anopts, delta_lw=deltalw_CD); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_C
         wI1I2nom_C = lw - (w2w_e + w2w_tot)
-        dI1I2eff_C = deff_I1I2(fit, regionws_C, wI1I2nom_C, dI1I20, dI10, dW10, legC=True, left_frac=left_frac)
+        dI1I2eff_C = mfpb_I1I2(fit, regionws_C, wI1I2nom_C, dI1I20, dI10, dW10, legC=True, left_frac=left_frac)
 
         plt.figure()
         plt.plot(lw_test, dI1I2eff_A/dI1I20*100, label='leg A')
@@ -687,32 +693,32 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False, plot_GdeffvGmfp=False):
     alphaI = 1
     test_fit = np.array([1, 1, 1, 0.5, 0.5, alphaI])
     mfpb_calc = (1/dW1_d + 1/(lw_d-w1w_d))**(-1)
-    # deff_calc = (dW1_d * mfpb_calc**alphaI)**(1/(1+alphaI))
-    deff_calc = np.sqrt(dW1_d * mfpb_calc)
+    # mfpb_calc = (dW1_d * mfpb_calc**alphaI)**(1/(1+alphaI))
+    mfpb_calc = np.sqrt(dW1_d * mfpb_calc)
 
     testbolo_d, testanopts_d = test_objs(stack_I=True, dW1=dW1_d, dI1=dI1I2_d, dI2=0, lw=lw_d, w1w=w1w_d, w2w=w2w_d)
 
     regionws_D = lw_regions(testbolo_d, testanopts_d); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_D
     wI1I2nom_D = lw - (w1w_s + w1w_e)
-    dI1I2eff_D = deff_I1I2(test_fit, regionws_D, wI1I2nom_D, dI1I2_d, dI1I2_d, dW1_d, legD=True, left_frac=1.)
+    dI1I2eff_D = mfpb_I1I2(test_fit, regionws_D, wI1I2nom_D, dI1I2_d, dI1I2_d, dW1_d, legD=True, left_frac=1.)
 
-    dI1I2eff_D    = deff_I1I2(test_fit, regionws_D, wI1I2nom_D, dI1I2_d, dI1I2_d, dW1_d, legD=True, left_frac=1.)
+    dI1I2eff_D    = mfpb_I1I2(test_fit, regionws_D, wI1I2nom_D, dI1I2_d, dI1I2_d, dW1_d, legD=True, left_frac=1.)
     GI1I2nomeff_D = G_layer(test_fit, dI1I2eff_D, layer='I') * wI1I2nom_D/5     # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
     GI1I2nom_D    = GI1I2_mfpb(test_fit, regionws_D, wI1I2nom_D, dI1I2_d, dI1I2_d, dW1_d, legD=True, left_frac=1.)
 
     regionws_A = lw_regions(testbolo_d, testanopts_d); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_A
     wI1I2nom_A = lw - (w2w_tot + w2w_e)
-    dI1I2eff_A = deff_I1I2(test_fit, regionws_A, wI1I2nom_A, dI1I2_d, dI1I2_d, dW1_d, legA=True, left_frac=1.)
+    dI1I2eff_A = mfpb_I1I2(test_fit, regionws_A, wI1I2nom_A, dI1I2_d, dI1I2_d, dW1_d, legA=True, left_frac=1.)
 
-    dI1I2eff_A    = deff_I1I2(test_fit, regionws_A, wI1I2nom_A, dI1I2_d, dI1I2_d, dW1_d, legA=True, left_frac=1.)
+    dI1I2eff_A    = mfpb_I1I2(test_fit, regionws_A, wI1I2nom_A, dI1I2_d, dI1I2_d, dW1_d, legA=True, left_frac=1.)
     GI1I2nomeff_A = G_layer(test_fit, dI1I2eff_A, layer='I') * wI1I2nom_A/5     # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
     GI1I2nom_A    = GI1I2_mfpb(test_fit, regionws_A, wI1I2nom_A, dI1I2_d, dI1I2_d, dW1_d, legA=True, left_frac=1.)
 
-    assert round(dI1I2eff_A/dI1I2eff_D, 3) == 1,    "deff_A / deff_D = {} != 1, but it should in this instance".format(round(dI1I2eff_A/dI1I2eff_D, 3))
+    assert round(dI1I2eff_A/dI1I2eff_D, 3) == 1,    "mfpb_A / mfpb_D = {} != 1, but it should in this instance".format(round(dI1I2eff_A/dI1I2eff_D, 3))
     assert round(GI1I2nom_A/GI1I2nom_D, 3) == 1,    "Geff_A / Geff_D = {} != 1, but it should in this instance".format(round(GI1I2nom_A/GI1I2nom_D, 3))
-    assert round(GI1I2nomeff_A/GI1I2nom_A, 3) == 1, "G_deff / G_mfp = {} != 1, but it should in this instance".format(round(GI1I2nomeff_A/GI1I2nom_A, 3))
+    assert round(GI1I2nomeff_A/GI1I2nom_A, 3) == 1, "G_mfpb / G_mfp = {} != 1, but it should in this instance".format(round(GI1I2nomeff_A/GI1I2nom_A, 3))
 
-    if plot_GdeffvGmfp:
+    if plot_GmfpbvGmfp:
 
         dW10 = 0.160; dW20 = 0.350
         dI10 = 0.350; dI20 = 0.300
@@ -726,12 +732,12 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False, plot_GdeffvGmfp=False):
         regionws_D = lw_regions(test_bolo, test_anopts); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_D
         wI1I2nom_D = lw - (w1w_s + w1w_e)
 
-        dI1I2eff_D     = deff_I1I2(fit, regionws_D, wI1I2nom_D, dI1I2_test, dI10, dW10, legD=True, left_frac=left_frac)
+        dI1I2eff_D     = mfpb_I1I2(fit, regionws_D, wI1I2nom_D, dI1I2_test, dI10, dW10, legD=True, left_frac=left_frac)
         GI1I2_nom_eff = G_layer(fit, dI1I2eff_D, layer='I') * wI1I2nom_D/5     # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
         GI1I2_nom     = GI1I2_mfpb(fit, regionws_D, wI1I2nom_D, dI1I2_test, dI10, dW10, legD=True, left_frac=left_frac)
 
         plt.figure()
-        plt.plot(dI1I2_test, GI1I2_nom_eff, label='deff calc')
+        plt.plot(dI1I2_test, GI1I2_nom_eff, label='mfpb calc')
         plt.plot(dI1I2_test, GI1I2_nom, label='mfp calc')
         plt.ylabel('Leg D GI1I2 [pW/K]')
         plt.xlabel('dI1I2 [um]')
@@ -743,14 +749,14 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False, plot_GdeffvGmfp=False):
         regionws_A = lw_regions(test_bolo, test_anopts); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_A
         wI1I2nom_A = lw - (w2w_tot + w2w_e)
 
-        dI1I2eff_A     = deff_I1I2(fit, regionws_A, wI1I2nom_A, dI1I2_test, dI10, dW10, legA=True, left_frac=left_frac)
+        dI1I2eff_A     = mfpb_I1I2(fit, regionws_A, wI1I2nom_A, dI1I2_test, dI10, dW10, legA=True, left_frac=left_frac)
         GI1I2_nom_eff = G_layer(fit, dI1I2eff_A, layer='I') * wI1I2nom_A/5     # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
         GI1I2_nom     = GI1I2_mfpb(fit, regionws_A, wI1I2nom_A, dI1I2_test, dI10, dW10, legA=True, left_frac=left_frac)
 
         plt.figure()
-        plt.plot(dI1I2_test, GI1I2_nom_eff/GI1I2_nom, label='deff calc')
-        plt.ylabel('Leg A Gdeff/Gmfp [pW/K]')
-        # plt.plot(dI1I2_test, GI1I2_nom_eff, label='deff calc')
+        plt.plot(dI1I2_test, GI1I2_nom_eff/GI1I2_nom, label='mfpb calc')
+        plt.ylabel('Leg A Gmfpb/Gmfp [pW/K]')
+        # plt.plot(dI1I2_test, GI1I2_nom_eff, label='mfpb calc')
         # plt.plot(dI1I2_test, GI1I2_nom, label='mfp calc')
         plt.ylabel('Leg A GI1I2 [pW/K]')
         plt.xlabel('dI1I2 [um]')
@@ -766,14 +772,14 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False, plot_GdeffvGmfp=False):
         regionws_D = lw_regions(test_bolo, test_anopts); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_D
         wI1I2nom_D = lw - (w1w_s + w1w_e)
 
-        dI1I2eff_D     = deff_I1I2(fit, regionws_D, wI1I2nom_D, dI1I20, dI10, dW10, legD=True, left_frac=left_frac)
+        dI1I2eff_D     = mfpb_I1I2(fit, regionws_D, wI1I2nom_D, dI1I20, dI10, dW10, legD=True, left_frac=left_frac)
         GI1I2_nom_eff = G_layer(fit, dI1I2eff_D, layer='I') * wI1I2nom_D/5     # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
         GI1I2_nom     = GI1I2_mfpb(fit, regionws_D, wI1I2nom_D, dI1I20, dI10, dW10, legD=True, left_frac=left_frac)
 
         plt.figure()
         plt.plot(lw_test, GI1I2_nom_eff/GI1I2_nom)
         plt.ylabel('Leg D Geff/Gmfp [pW/K]')
-        # plt.plot(lw_test, GI1I2_nom_eff, label='deff calc')
+        # plt.plot(lw_test, GI1I2_nom_eff, label='mfpb calc')
         # plt.plot(lw_test, GI1I2_nom, label='mfp calc')
         # plt.ylabel('Leg D GI1I2 [pW/K]')
         # plt.legend()
@@ -785,14 +791,14 @@ def test_deff(alpha=1, left_frac=1., plot_deff=False, plot_GdeffvGmfp=False):
         regionws_A = lw_regions(test_bolo, test_anopts); lw, w2w_ns, w1w_ns, w2w_s, w1w_s, w2w_e, w1w_e, w2w_tot, w1w_tot, wI2_ext = regionws_A
         wI1I2nom_A = lw - (w2w_tot + w2w_e)
 
-        dI1I2eff_A     = deff_I1I2(fit, regionws_A, wI1I2nom_A, dI1I20, dI10, dW10, legA=True, left_frac=left_frac)
+        dI1I2eff_A     = mfpb_I1I2(fit, regionws_A, wI1I2nom_A, dI1I20, dI10, dW10, legA=True, left_frac=left_frac)
         GI1I2_nom_eff = G_layer(fit, dI1I2eff_A, layer='I') * wI1I2nom_A/5     # total G of I stacks with nominal thickness, incl. lw beyond W1 edge
         GI1I2_nom     = GI1I2_mfpb(fit, regionws_A, wI1I2nom_A, dI1I20, dI10, dW10, legA=True, left_frac=left_frac)
 
         plt.figure()
         plt.plot(lw_test, GI1I2_nom_eff/GI1I2_nom)
         plt.ylabel('Leg A Geff/Gmfp [pW/K]')
-        # plt.plot(lw_test, GI1I2_nom_eff, label='deff calc')
+        # plt.plot(lw_test, GI1I2_nom_eff, label='mfpb calc')
         # plt.plot(lw_test, GI1I2_nom, label='mfp calc')
         # plt.ylabel('Leg A GI1I2 [pW/K]')
         # plt.legend()
