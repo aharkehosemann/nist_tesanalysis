@@ -806,5 +806,43 @@ def test_mfpb(alpha=1, left_frac=1., plot_mfpb=False, plot_GmfpbvGmfp=False):
         plt.xlim(min(lw_test), max(lw_test))
         plt.grid(linestyle = '--', which='both', linewidth=0.5)
 
+    return
+
+def test_fitPd():
+
+    dW1 = 0.160; dW2 = 0.350
+    dI1 = 0.350; dI2 = 0.300
+    lw  = 6.0;   w2w = 3.5; w1w = 5.
+    dI1I2 = dI1 + dI2
+    d_sub = 0.6
+
+    stack_I = True
+    test_fit = np.array([1, 1, 1, 0.2, 0.4, 0.8])
+    # test_fit = np.array([[1, 1, 1, 0.2, 0.4, 0.8], [1, 1, 1, 0.2, 0.4, 0.8]])
+
+    GS0  = test_fit[0]
+    Pd_S = test_fit[3]
+    GI0  = test_fit[2]
+    Pd_I = test_fit[5]
+
+    test_bolo, test_anopts = test_objs(stack_I=stack_I, dsub=d_sub, dW1=dW1, dW2=dW2, dI1=dI1I2, dI2=dI2, lw=lw, w1w=w1w, w2w=w2w)
+
+    region_ws = lw_regions(test_bolo, test_anopts)
+    wI1I2     = lw - w2w
+
+    mfp_S  = mfpb(lw, d_sub, walls=2, Pd_d=Pd_S)
+    mfp0_S = mfpb(5., 0.400, walls=2, Pd_d=Pd_S)
+    G_S   = G_layer(test_fit, d_sub, layer='S', mfp_b=mfp_S, mfp0=mfp0_S, fitPd_d=True) * lw/5    # substrate still treated as separate layer
+
+    mfpS_calc  = 1/(Pd_S/d_sub + 1/lw)
+    mfp0S_calc = 1/(Pd_S/0.4 + 1/5.)
+    assert np.round(mfp_S/mfpS_calc, 3)==1, "mfp_S function output and manual calculation don't match"
+    assert np.round(mfp0_S/mfp0S_calc, 3)==1, "mfp0_S function output and manual calculation don't match"
+
+    GS_calc = GS0 * (d_sub/0.400) * (mfpS_calc/mfp0S_calc) * lw/5
+
+    assert np.round(G_S/GS_calc, 3)==1, "GS function output and manual calculation don't match"
+
+    GI1I2_nom = GI1I2_mfpb(test_fit, region_ws, wI1I2, dI1I2, dI1, dW1, stack_I=stack_I, legA=True, Pd_d=Pd_I, fitPd_d=True)
 
     return
