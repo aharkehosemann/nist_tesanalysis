@@ -733,7 +733,7 @@ def G_layer(fit, d, layer='S', model='Three-Layer', w0=5.0, d0=0.400, mfp_b=-1.,
         G0s     = fit[:, linds[0]]   # G0s for layer x
         alpha0s = fit[:, linds[1]]   # alphas for layer x
         # alphas  = alphad(d, alpha0s, d0=d0) if alphaofd else alpha0s
-        if fitPd_d: alphas = np.ones_like(alphas)   # fitting for Pd in mfp calc, not alpha power law
+        if fitPd_d: alphas = np.ones_like(alpha0s)   # fitting for Pd in mfp calc, not alpha power law
         if scalar_d:
             alphas  = alphad(d, alpha0s, d0=d0) if alphaofd else alpha0s
             if fitPd_d: alphas = np.ones_like(alphas)   # fitting for Pd in mfp calc, not alpha power law
@@ -3012,6 +3012,10 @@ def mfpk_fromLa(Gb, w, d, C_v, vs, La):   # diffusive mfp from acoustic length
 
 def mfpa_fromLa(La):   # acoustic mfp from acoustic length
     return 4 / np.pi * La
+
+def G_lengthscale(L, d, w, elli, Pd_d=1., Pd_w=1.):
+    ell = (Pd_d/d + Pd_w/w + 1/elli)**(-1)
+
 
 def Cv_wang(T):
     # amorphous SiNx specific heat = a*T + b*T^3
