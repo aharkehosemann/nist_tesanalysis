@@ -1271,7 +1271,7 @@ def runsim_chisq(bolo, an_opts, plot_opts, save_sim=False):
     Gpred_Ws = G_bolotest(pfits_sim, an_opts, bolo, layer='W')   # W layer contributions
     Gpred_Is = G_bolotest(pfits_sim, an_opts, bolo, layer='I')   # I layer contributions
     Gwires   = G_bolotest(pfits_sim, an_opts, bolo, layer='wiring').T[0]/4   # function outputs G_microstrip for four legs
-    chisq_fits   = np.array([chisq_val(pfits_sim[ii,:], [an_opts, bolo]) for ii in range(num_its)])
+    # chisq_fits   = np.array([chisq_val(pfits_sim[ii,:], [an_opts, bolo]) for ii in range(num_its)])
 
     sim_dict = {}
     sim_dict['sim'] = {}   # save simulation arrays
@@ -1284,7 +1284,7 @@ def runsim_chisq(bolo, an_opts, plot_opts, save_sim=False):
     sim_dict['Gpred_Ws'] = Gpred_Ws  # G(d0) predictions using the fit parameters from each iteration
     sim_dict['Gpred_Is'] = Gpred_Is  # G(d0) predictions using the fit parameters from each iteration
     sim_dict['Gpred_Is'] = Gpred_Is  # G(d0) predictions using the fit parameters from each iteration
-    sim_dict['chisq_fits'] = chisq_fits
+    # sim_dict['chisq_fits'] = chisq_fits
 
     # save analysis options and bolometer geometry/data
     sim_dict['an_opts'] = an_opts
@@ -1385,7 +1385,7 @@ def sort_results(sim_dict, print_results=False, spinds=np.array([])):
     chisq_fit =  chisq_val(sim_params, [an_opts, bolo]); rchisq_fit = chisq_fit/dof
     chisq_pred = chisq_val(sim_params, [an_opts, bolo_pred]); rchisq_pred = chisq_pred/dof
     chisq_qsum = chisq_val(sim_params, [an_opts, bolo_qsum]); rchisq_qsum = chisq_qsum/dof
-    chisq_fits = sim_dict['chisq_fits']
+    # chisq_fits = sim_dict['chisq_fits']
 
 
     # sort final results
@@ -1422,7 +1422,7 @@ def sort_results(sim_dict, print_results=False, spinds=np.array([])):
         print('Chi-squared (sig_GTES)   : ', round(chisq_fit, 3))#, '; Reduced Chi-squared value: ', round(rchisq_fit, 3))
         print('Chi-squared (sig_Gpred)  : ', round(chisq_pred, 3))#, '; Reduced Chi-squared value: ', round(rchisq_pred, 3))
         # print('Chi-squared (sig_quadsum): ', round(chisq_qsum, 3))#, '; Reduced Chi-squared value: ', round(rchisq_pred, 3))
-        print('Median Chi-squared (sig_GTES) = {:.1f} +/- {:.1f}'.format(np.nanmedian(chisq_fits), np.nanstd(chisq_fits)))
+        # print('Median Chi-squared (sig_GTES) = {:.1f} +/- {:.1f}'.format(np.nanmedian(chisq_fits), np.nanstd(chisq_fits)))
         print('\n\n')
 
     return fit_dict
@@ -3125,7 +3125,7 @@ def l_PLT02(vs):   # mfp at 170 mK for amorphous solids from dominant phonon wav
 def monopower(x, m, t, b):
     return m * x**t + b
 
-def fit_power(x, y, p0, sigma=[], absolute_sigma=True):
+def fit_power(x, y, p0, sigma=[], absolute_sigma=True, fixed_m=np.nan, fixed_t=np.nan, fixed_y0=np.nan):
     # returns power explicitly
     # idk if this is lazy or actually extra work
 
@@ -3134,8 +3134,39 @@ def fit_power(x, y, p0, sigma=[], absolute_sigma=True):
         print('Ignoring NaNs while fitting power law')
     sinds = np.where(~np.isnan(y))[0]   # scalar indices
 
-    params, pcov = curve_fit(monopower, x[sinds], y[sinds], p0, sigma=sigma[sinds], absolute_sigma=absolute_sigma)
-    perr = np.sqrt(np.diag(pcov)); t = params[1]; sigma_t = perr[1]
+    if np.isfinite(fixed_m):
+        if np.isfinite(fixed_t):
+            pinds = np.array([2])
+            # p0 = p0[2]
+            fit_func = lambda x, y0, : monopower(x, fixed_m, fixed_t, y0)
+        else:
+            # p0 = p0[[1, 2]]
+            pinds = np.array([1, 2])
+            fit_func = lambda x, t, y0, : monopower(x, fixed_m, t, y0)
+    elif np.isfinite(fixed_t):
+        # p0 = p0[[0, 2]]
+        pinds = np.array([0, 2])
+        fit_func = lambda x, m, y0: monopower(x, m, fixed_t, y0)
+    elif np.isfinite(fixed_y0):
+        # p0 = p0[[0, 1]]
+        pinds = np.array([0, 1])
+        fit_func = lambda x, m, t: monopower(x, m, t, fixed_y0)
+    else:
+        pinds = np.array([0, 1, 2])
+        fit_func = lambda x, m, t, y0: monopower(x, m, t, y0)
+
+    p0 = p0[pinds]
+
+    if len(sigma) == 0:
+        if np.isscalar(p0) == 1:
+            params = curve_fit(fit_func, x[sinds], y[sinds], p0=p0)
+            perr = 0; t = fixed_t; sigma_t = 0
+        else:
+            params, pcov = curve_fit(fit_func, x[sinds], y[sinds], p0=p0)
+            perr = np.sqrt(np.diag(pcov)); t = params[1]; sigma_t = perr[1]
+    else:
+        params, pcov = curve_fit(fit_func, x[sinds], y[sinds], p0, sigma=sigma[sinds], absolute_sigma=absolute_sigma)
+        perr = np.sqrt(np.diag(pcov)); t = params[1]; sigma_t = perr[1]
     return params, t, sigma_t
 
 def f_BE(f, T):
